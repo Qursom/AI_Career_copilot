@@ -1,4 +1,9 @@
-import { HttpStatus, Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  HttpStatus,
+  Logger,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -6,6 +11,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { TypedConfigService } from './config/typed-config.service';
+import { LlmService } from './llm/llm.service';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
@@ -18,15 +24,16 @@ async function bootstrap(): Promise<void> {
 
   app.useLogger(
     ['error', 'warn', 'log', 'debug', 'verbose'].filter(
-      (l) =>
-        levelIndex(l) <= levelIndex(config.get('LOG_LEVEL')),
+      (l) => levelIndex(l) <= levelIndex(config.get('LOG_LEVEL')),
     ) as ('error' | 'warn' | 'log' | 'debug' | 'verbose')[],
   );
 
   app.set('trust proxy', 1);
   app.set('x-powered-by', false);
 
-  app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+  app.use(
+    helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }),
+  );
   app.use(compression());
 
   app.setGlobalPrefix(config.get('API_PREFIX'), {
@@ -83,8 +90,10 @@ async function bootstrap(): Promise<void> {
   const port = config.get('PORT');
   await app.listen(port);
 
+  const llm = app.get(LlmService);
+  const llmEnv = config.get('LLM_PROVIDER');
   logger.log(
-    `🚀 ${config.get('NODE_ENV')} API ready at http://localhost:${port}/${config.get('API_PREFIX')}/v1 (llm=${app.get(TypedConfigService).get('LLM_PROVIDER')})`,
+    `🚀 ${config.get('NODE_ENV')} API ready at http://localhost:${port}/${config.get('API_PREFIX')}/v1 (llm=${llm.providerName}, LLM_PROVIDER=${llmEnv})`,
   );
 }
 
@@ -95,7 +104,6 @@ function levelIndex(level: string): number {
 }
 
 bootstrap().catch((err: unknown) => {
-  // eslint-disable-next-line no-console
   console.error('Fatal bootstrap error:', err);
   process.exit(1);
 });

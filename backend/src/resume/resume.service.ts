@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
 import {
   LlmInvalidOutputError,
@@ -6,10 +10,10 @@ import {
   LlmUpstreamError,
 } from '../llm/llm.interface';
 import type { AnalyzeResumeDto } from './dto/analyze-resume.dto';
-import {
-  ResumeAnalysisSchema,
-  type ResumeAnalysis,
-} from './resume.schema';
+import { ResumeAnalysisSchema, type ResumeAnalysis } from './resume.schema';
+import { mergeMockWithRagFields } from '../rag/merge-mock-rag';
+import { RagService } from '../rag/rag.service';
+import { userMessageForUpstreamError } from '../llm/llm-upstream.user-message';
 
 const SYSTEM_PROMPT = `You are a senior career coach and ATS specialist.
 
@@ -42,6 +46,16 @@ Analyze the resume and return STRICT JSON with the following keys:
   absent from the resume. Order by importance for the role. Do NOT include
   skills the resume already mentions.
 
+- "marketSignals": string[]
+  2-6 concise, evidence-grounded expectations from retrieved labor-market
+  context. These should support your recommendations.
+
+- "priorityGaps": string[]
+  0-6 high-priority gaps based on retrieved context and the resume content.
+
+- "citations": string[]
+  0-4 source citations from the retrieved context (source name and URL text).
+
 - "optimized": string
   Rewrite 4–6 high-impact bullets for the target role with strong action
   verbs, quantified impact, and keywords the target-role ATS will parse.
@@ -63,23 +77,49 @@ Rules:
 export class ResumeService {
   private readonly logger = new Logger(ResumeService.name);
 
-  constructor(private readonly llm: LlmService) {}
+  constructor(
+    private readonly llm: LlmService,
+    private readonly rag: RagService,
+  ) {}
 
   async analyze(dto: AnalyzeResumeDto): Promise<ResumeAnalysis> {
-    const userPrompt = this.buildUserPrompt(dto);
+    const ragContext = await this.rag.buildResumeContext({
+      role: dto.role,
+      resume: dto.resume,
+    });
+    const userPrompt = this.buildUserPrompt(dto, ragContext.promptContext);
 
     try {
-      return await this.llm.generateStructured({
+      const result = await this.llm.generateStructured({
         system: SYSTEM_PROMPT,
         prompt: userPrompt,
         schema: ResumeAnalysisSchema,
       });
+      const merged = mergeMockWithRagFields(
+        this.llm.providerName,
+        {
+          marketSignals: ragContext.marketSignals,
+          priorityGaps: ragContext.priorityGaps,
+          citations: ragContext.citations,
+        },
+        {
+          marketSignals: result.marketSignals,
+          priorityGaps: result.priorityGaps,
+          citations: result.citations,
+        },
+      );
+      return {
+        ...result,
+        marketSignals: merged.marketSignals,
+        priorityGaps: merged.priorityGaps,
+        citations: merged.citations,
+      };
     } catch (err) {
       this.handleLlmError(err, 'analyze');
     }
   }
 
-  private buildUserPrompt(dto: AnalyzeResumeDto): string {
+  private buildUserPrompt(dto: AnalyzeResumeDto, ragContext: string): string {
     const lines = [`RESUME:\n${dto.resume}`];
     if (dto.role) {
       lines.push(
@@ -90,6 +130,9 @@ export class ResumeService {
       lines.push(
         `\nNo target role provided. Infer the most likely role from the resume content and state your inference briefly in "atsNotes" before tailoring the rest of the response.`,
       );
+    }
+    if (ragContext) {
+      lines.push(`\n${ragContext}`);
     }
     return lines.join('\n');
   }
@@ -111,9 +154,13 @@ export class ResumeService {
       });
     }
     if (err instanceof LlmUpstreamError) {
-      this.logger.error(`resume.${op}: upstream error: ${err.message}`);
+      const causeLine =
+        err.cause instanceof Error ? ` | cause: ${err.cause.message}` : '';
+      this.logger.error(
+        `resume.${op}: upstream error: ${err.message}${causeLine}`,
+      );
       throw new ServiceUnavailableException({
-        message: 'The AI provider is currently unavailable.',
+        message: userMessageForUpstreamError(err),
         error: 'LLM_UPSTREAM',
       });
     }

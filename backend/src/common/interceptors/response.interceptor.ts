@@ -25,9 +25,10 @@ export interface ApiEnvelope<T> {
  * Raw responses (e.g. streams, redirects) are passed through unchanged.
  */
 @Injectable()
-export class ResponseInterceptor<T>
-  implements NestInterceptor<T, ApiEnvelope<T> | T>
-{
+export class ResponseInterceptor<T> implements NestInterceptor<
+  T,
+  ApiEnvelope<T> | T
+> {
   intercept(
     ctx: ExecutionContext,
     next: CallHandler<T>,

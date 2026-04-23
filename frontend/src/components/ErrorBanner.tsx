@@ -33,7 +33,9 @@ function describe(error: ApiError | Error): {
   if (error.isUpstream) {
     return {
       title: "The AI provider is having a moment",
-      body: "The upstream model call failed or timed out. Please try again.",
+      body:
+        error.message.trim() ||
+        "The upstream model call failed or timed out. Please try again.",
     };
   }
   if (error.status === 0) {

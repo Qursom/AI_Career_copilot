@@ -42,7 +42,7 @@ export default function JobMatchPage() {
         <p className="mt-4 text-white/60 max-w-2xl">
           Paste a job description and your resume. We&apos;ll score the match,
           pull out your strongest signals, and flag gaps to fix before you hit
-          submit.
+          submit, grounded by retrieved public labor-market role data.
         </p>
       </div>
 
@@ -149,12 +149,36 @@ export default function JobMatchPage() {
               items={result.gaps}
             />
             <BulletCard
+              title="Market Signals (RAG)"
+              tone="info"
+              icon={<path d="M3 3v18h18 M7 13l3-3 3 2 4-5" />}
+              items={result.marketSignals}
+              emptyHint="No market evidence retrieved for this request."
+            />
+            <BulletCard
+              title="Priority Market Gaps"
+              tone="warning"
+              icon={
+                <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              }
+              items={result.priorityGaps}
+              emptyHint="No market-priority gaps detected."
+            />
+            <BulletCard
               title="Suggested edits"
               tone="info"
               icon={
                 <path d="M12 20h9 M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
               }
               items={result.suggestions}
+            />
+            <BulletCard
+              title="Evidence Sources"
+              tone="info"
+              icon={<path d="M12 6v12 M6 12h12" />}
+              items={result.citations}
+              variant="pills"
+              emptyHint="No retrieval citations attached."
             />
           </div>
         </div>

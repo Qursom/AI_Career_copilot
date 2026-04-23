@@ -1,8 +1,5 @@
 import { Logger } from '@nestjs/common';
-import type {
-  GenerateStructuredArgs,
-  LlmProvider,
-} from '../llm.interface';
+import type { GenerateStructuredArgs, LlmProvider } from '../llm.interface';
 import { LlmInvalidOutputError } from '../llm.interface';
 
 /**
@@ -63,7 +60,9 @@ function parsePrompt(prompt: string): PromptCtx {
   const roleMatch = prompt.match(/TARGET ROLE:\s*(.+)/i);
   const role = roleMatch ? roleMatch[1].trim() : '';
 
-  const resumeMatch = prompt.match(/RESUME:\s*([\s\S]*?)(?:\n\s*TARGET ROLE:|$)/i);
+  const resumeMatch = prompt.match(
+    /RESUME:\s*([\s\S]*?)(?:\n\s*TARGET ROLE:|$)/i,
+  );
   const resume = resumeMatch ? resumeMatch[1].trim() : prompt;
 
   const jdMatch = prompt.match(
@@ -121,7 +120,8 @@ const SKILL: Record<string, SkillDef> = {
   },
   aws: {
     label: 'AWS (ECS / Lambda / RDS / S3)',
-    match: /\b(aws|ecs|lambda|rds|s3|dynamodb|cloudfront|cloudwatch|sns|sqs)\b/i,
+    match:
+      /\b(aws|ecs|lambda|rds|s3|dynamodb|cloudfront|cloudwatch|sns|sqs)\b/i,
   },
   gcp: {
     label: 'GCP (GKE / Cloud Run / BigQuery)',
@@ -129,11 +129,13 @@ const SKILL: Record<string, SkillDef> = {
   },
   observability: {
     label: 'Observability (OpenTelemetry / Datadog)',
-    match: /\b(opentelemetry|otel|datadog|new\s?relic|prometheus|grafana|sentry)\b/i,
+    match:
+      /\b(opentelemetry|otel|datadog|new\s?relic|prometheus|grafana|sentry)\b/i,
   },
   cicd: {
     label: 'CI/CD pipelines',
-    match: /\bci\/?cd\b|\b(github\s?actions|jenkins|circle\s?ci|argo\s?cd|gitlab\s?ci)\b/i,
+    match:
+      /\bci\/?cd\b|\b(github\s?actions|jenkins|circle\s?ci|argo\s?cd|gitlab\s?ci)\b/i,
   },
   testing: {
     label: 'Unit & integration testing',
@@ -155,7 +157,8 @@ const SKILL: Record<string, SkillDef> = {
   svelte: { label: 'Svelte / SvelteKit', match: /\bsvelte(?:kit)?\b/i },
   css: {
     label: 'Modern CSS / Tailwind',
-    match: /\b(tailwind|css\s?modules|styled[- ]components|emotion|sass|less)\b/i,
+    match:
+      /\b(tailwind|css\s?modules|styled[- ]components|emotion|sass|less)\b/i,
   },
   a11y: {
     label: 'Accessibility (WCAG 2.2)',
@@ -171,16 +174,21 @@ const SKILL: Record<string, SkillDef> = {
   },
   designSystem: {
     label: 'Design systems',
-    match: /\b(design\s?system|storybook|figma\s?tokens|component\s?library)\b/i,
+    match:
+      /\b(design\s?system|storybook|figma\s?tokens|component\s?library)\b/i,
   },
   state: {
     label: 'State management (Redux / Zustand / TanStack Query)',
-    match: /\b(redux|zustand|jotai|recoil|tanstack\s?query|react\s?query|rtk)\b/i,
+    match:
+      /\b(redux|zustand|jotai|recoil|tanstack\s?query|react\s?query|rtk)\b/i,
   },
   // Data / ML
   python: { label: 'Python', match: /\bpython\b/i },
   spark: { label: 'Spark', match: /\bspark\b|\bdatabricks\b/i },
-  airflow: { label: 'Airflow / Dagster', match: /\b(airflow|dagster|prefect)\b/i },
+  airflow: {
+    label: 'Airflow / Dagster',
+    match: /\b(airflow|dagster|prefect)\b/i,
+  },
   dbt: { label: 'dbt', match: /\bdbt\b/i },
   warehouse: {
     label: 'Snowflake / BigQuery / Redshift',
@@ -196,10 +204,14 @@ const SKILL: Record<string, SkillDef> = {
   },
   experiment: {
     label: 'Experimentation & A/B testing',
-    match: /\b(a\/?b\s?test|experiment|statistical\s?significance|p[- ]value)\b/i,
+    match:
+      /\b(a\/?b\s?test|experiment|statistical\s?significance|p[- ]value)\b/i,
   },
   // Mobile
-  ios: { label: 'iOS / Swift / SwiftUI', match: /\b(ios|swift(?:ui)?|xcode)\b/i },
+  ios: {
+    label: 'iOS / Swift / SwiftUI',
+    match: /\b(ios|swift(?:ui)?|xcode)\b/i,
+  },
   android: {
     label: 'Android / Kotlin / Jetpack Compose',
     match: /\b(android|kotlin|jetpack\s?compose)\b/i,
@@ -216,8 +228,14 @@ const SKILL: Record<string, SkillDef> = {
     match: /\b(slo|sli|error\s?budget|on[- ]call|mttr|rto|rpo)\b/i,
   },
   // Other common language stacks
-  java: { label: 'Java / Spring Boot', match: /\b(java|spring\s?boot|hibernate)\b/i },
-  go: { label: 'Go / Golang', match: /\b(golang|\bgo\s?1\.\d+)\b|\bgo programming\b/i },
+  java: {
+    label: 'Java / Spring Boot',
+    match: /\b(java|spring\s?boot|hibernate)\b/i,
+  },
+  go: {
+    label: 'Go / Golang',
+    match: /\b(golang|\bgo\s?1\.\d+)\b|\bgo programming\b/i,
+  },
   dotnet: { label: '.NET / C#', match: /\b(\.net|c#|asp\.?net)\b/i },
   ruby: { label: 'Ruby on Rails', match: /\b(ruby|rails)\b/i },
   rust: { label: 'Rust', match: /\brust\b/i },
@@ -308,7 +326,9 @@ const BACKEND_GENERIC: RoleProfile = {
     /\b(java|spring|go|golang|python|rails|\.net|c#|rust)\s+(developer|engineer)/i,
     /\bmicroservices?\b/i,
   ],
-  contentPatterns: [/\b(spring|django|flask|fastapi|rails|gin|actix|asp\.?net)\b/i],
+  contentPatterns: [
+    /\b(spring|django|flask|fastapi|rails|gin|actix|asp\.?net)\b/i,
+  ],
   coreSkills: [
     SKILL.rest,
     SKILL.graphql,
@@ -389,10 +409,7 @@ const FRONTEND: RoleProfile = {
 const FULLSTACK: RoleProfile = {
   id: 'fullstack',
   label: 'Full-Stack Engineer',
-  hintPatterns: [
-    /\bfull[- ]?stack\b/i,
-    /\bsoftware\s+(developer|engineer)\b/i,
-  ],
+  hintPatterns: [/\bfull[- ]?stack\b/i, /\bsoftware\s+(developer|engineer)\b/i],
   contentPatterns: [],
   coreSkills: [
     SKILL.ts,
@@ -436,7 +453,9 @@ const DATA_ENGINEER: RoleProfile = {
     /\banalytics\s+engineer/i,
     /\betl\s+(developer|engineer)/i,
   ],
-  contentPatterns: [/\b(airflow|dbt|spark|snowflake|bigquery|redshift|databricks)\b/i],
+  contentPatterns: [
+    /\b(airflow|dbt|spark|snowflake|bigquery|redshift|databricks)\b/i,
+  ],
   coreSkills: [
     SKILL.python,
     SKILL.sql,
@@ -517,7 +536,9 @@ const DEVOPS: RoleProfile = {
     /\bplatform\s+engineer\b/i,
     /\binfra(structure)?\s+engineer\b/i,
   ],
-  contentPatterns: [/\b(kubernetes|terraform|helm|ansible|ci\/?cd|prometheus)\b/i],
+  contentPatterns: [
+    /\b(kubernetes|terraform|helm|ansible|ci\/?cd|prometheus)\b/i,
+  ],
   coreSkills: [
     SKILL.k8s,
     SKILL.docker,
@@ -733,6 +754,23 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
 
   // ---- missing skills
   const missingSkillLabels = missing.slice(0, 7).map((s) => s.label);
+  const citations = [
+    'O*NET + ESCO crosswalk (https://www.onetonline.org/)',
+    'ESCO framework (https://esco.ec.europa.eu/)',
+  ];
+  const marketSignals = dedupe(
+    missing
+      .slice(0, 5)
+      .map(
+        (s) =>
+          `${s.label} appears as a market-priority expectation for ${profile.label} roles.`,
+      ),
+  );
+  const priorityGaps = dedupe(
+    missingSkillLabels.map(
+      (label) => `${label} is a high-priority market gap for this role.`,
+    ),
+  );
 
   // ---- optimized rewrite
   const optimized = profile.bullets.slice(0, 6).join('\n');
@@ -790,6 +828,9 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
     strengths: dedupe(strengths).slice(0, 5),
     improvements: dedupe(improvements).slice(0, 6),
     missingSkills: dedupe(missingSkillLabels).slice(0, 7),
+    marketSignals: marketSignals.slice(0, 5),
+    priorityGaps: priorityGaps.slice(0, 5),
+    citations,
     optimized,
     atsScore,
     atsNotes,

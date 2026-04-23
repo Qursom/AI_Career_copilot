@@ -5,9 +5,12 @@ AI Career Copilot is a full-stack app that helps candidates improve resumes and 
 It ships with:
 - A polished **Next.js frontend** for resume analysis and job matching workflows.
 - A **NestJS backend API** with validation, structured error handling, request IDs, throttling, and Swagger docs.
-- Pluggable LLM providers:
-  - `mock` (default): deterministic offline responses for fast local development.
-  - `gemini`: live responses via Google Gemini when `GEMINI_API_KEY` is configured.
+- A **RAG pipeline** (Pinecone) with **OpenAI** or **Gemini** embeddings, plus a seeded corpus: public O*NET-style role skills + a **comparison** resume/JD/skill text set. Run `rag:ingest` to upsert vectors (see [Environment variables](#environment-variables)).
+- Pluggable **chat** LLM providers (`LLM_PROVIDER`):
+  - `mock` (default in `.env.example`): deterministic offline JSON for local development.
+  - `openai`: resume + job-match when `OPENAI_API_KEY` is set.
+  - `gemini`: when `GEMINI_API_KEY` is set.
+- **Embeddings** for RAG are separate (`RAG_EMBEDDING_PROVIDER`): use `openai` with `text-embedding-3-*` or `gemini` with the configured `GEMINI_EMBEDDING_*` models. Index **dimensions** in Pinecone must match `OPENAI_EMBEDDING_DIMENSIONS` or `GEMINI_EMBEDDING_DIMENSIONS`.
 
 ## What It Does
 
@@ -19,6 +22,9 @@ The app returns:
 - strengths
 - improvements
 - missing skills
+- market signals (RAG-grounded)
+- priority gaps (market-aware)
+- citations for retrieved role evidence
 - optimized rewrite
 - ATS score + ATS notes
 
@@ -29,6 +35,9 @@ The app returns:
 - match score
 - strengths
 - gaps
+- market signals (RAG-grounded)
+- priority gaps (market-aware)
+- citations for retrieved role evidence
 - suggested edits
 
 ## How It Works (Request Flow)
@@ -37,14 +46,16 @@ The app returns:
 2. Frontend calls typed API client in `frontend/src/lib/api.ts`.
 3. Requests hit NestJS endpoints under `/api/v1`.
 4. Backend validates input DTOs and applies global middleware/interceptors/filters.
-5. `LlmService` delegates to selected provider (`mock` or `gemini`).
-6. Response is returned in a standard envelope, and frontend renders cards/charts.
+5. `RagService` embeds query text, retrieves top matches from Pinecone, and builds evidence context.
+6. `LlmService` delegates to the selected provider (`mock`, `openai`, or `gemini`) with retrieved context injected into prompts.
+7. Response is returned in a standard envelope, and frontend renders cards/charts.
 
 ## Tech Stack
 
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS
 - **Backend:** NestJS 11, TypeScript, Zod config validation, Swagger
-- **AI:** `@google/generative-ai` with provider abstraction
+- **AI:** OpenAI and Google Generative AI via pluggable LLM and embedding providers
+- **Retrieval:** Pinecone with seeded vectors (O*NET-style + comparison corpus); CLI ingestion via `npm --prefix backend run rag:ingest`
 - **Quality/ops:** ESLint, Jest (backend), throttling, helmet, compression, request tracing
 
 ## Project Structure
@@ -91,27 +102,27 @@ Default URLs:
 
 ## Environment Variables
 
-### Backend (`backend/.env`)
+The canonical template is [`backend/.env.example`](backend/.env.example). Copy it to `backend/.env` and fill in keys.
 
-```env
-NODE_ENV=development
-PORT=3001
-API_PREFIX=api
-CORS_ORIGIN=http://localhost:3000
+### Backend (`backend/.env`) — important pairs
 
-THROTTLE_TTL_MS=60000
-THROTTLE_LIMIT=30
-LOG_LEVEL=log
-
-LLM_PROVIDER=mock
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.0-flash
-LLM_TIMEOUT_MS=30000
-```
+| Concern | Variables |
+|--------|-----------|
+| **Chat (resume / job match JSON)** | `LLM_PROVIDER`, `OPENAI_API_KEY` (if `openai`), `OPENAI_MODEL`, optional `OPENAI_MAX_COMPLETION_TOKENS` |
+| **RAG embeddings** | `RAG_EMBEDDING_PROVIDER` (`openai` \| `gemini`), matching `OPENAI_*` or `GEMINI_EMBEDDING_*` + `OPENAI_API_KEY` or `GEMINI_API_KEY` |
+| **Pinecone** | `PINECONE_API_KEY`, `PINECONE_INDEX`, `PINECONE_NAMESPACE`, optional `PINECONE_HOST` (serverless), `PINECONE_MIN_SCORE` (default `0.45` in schema if unset; lower e.g. `0.35` if nothing retrieves) |
 
 Notes:
-- Keep `LLM_PROVIDER=mock` for offline deterministic behavior.
-- Set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` to use live Gemini output.
+
+- `OPENAI_API_KEY` is used both for `LLM_PROVIDER=openai` and for `RAG_EMBEDDING_PROVIDER=openai` (same key is fine). If the key is empty while RAG expects OpenAI embeddings, retrieval uses noop embeddings and **ingest** skips vectors.
+- Create a Pinecone index whose **vector dimension** matches your embedding model (e.g. **3072** for `text-embedding-3-large` with `OPENAI_EMBEDDING_DIMENSIONS=3072`).
+- **Ingestion is manual:** after keys and index match, run:
+
+```bash
+npm --prefix backend run rag:ingest
+```
+
+You should see a log like `RAG ingestion complete: processed=31, upserted=31` (counts depend on the seed). If you see `429` / quota from OpenAI, add billing or use `RAG_EMBEDDING_PROVIDER=gemini` with a valid `GEMINI_API_KEY` and a **768**-dim index to match `GEMINI_EMBEDDING_DIMENSIONS`.
 
 ### Frontend (`frontend/.env.local`)
 
@@ -140,6 +151,7 @@ From the repository root:
 - `npm start` - run both apps in production mode
 - `npm run lint` - lint frontend and backend
 - `npm test` - run backend tests
+- `npm --prefix backend run rag:ingest` - embed + upsert public role-skill corpus into Pinecone
 
 ## Production Notes
 

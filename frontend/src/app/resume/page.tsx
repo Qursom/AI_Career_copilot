@@ -51,7 +51,7 @@ export default function ResumePage() {
         <p className="mt-4 text-white/60 max-w-2xl">
           Paste or upload your resume. In seconds you&apos;ll get an unfiltered
           roast, a rewritten version, strengths, gaps, missing skills, and an
-          ATS score.
+          ATS score grounded with real-world role expectations.
         </p>
       </div>
 
@@ -155,6 +155,31 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
         icon={
           <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
         }
+      />
+
+      <BulletCard
+        title="Market Signals (RAG)"
+        tone="info"
+        items={data.marketSignals}
+        emptyHint="No market evidence retrieved for this run."
+        icon={<path d="M3 3v18h18 M7 13l3-3 3 2 4-5" />}
+      />
+
+      <BulletCard
+        title="Priority Market Gaps"
+        tone="warning"
+        items={data.priorityGaps}
+        emptyHint="No market-priority gaps detected."
+        icon={<path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />}
+      />
+
+      <BulletCard
+        title="Evidence Sources"
+        tone="info"
+        items={data.citations}
+        variant="pills"
+        emptyHint="No retrieval citations were attached."
+        icon={<path d="M12 6v12 M6 12h12" />}
       />
 
       <ResultCard

@@ -1,6 +1,10 @@
-import 'express';
+import 'express-serve-static-core';
 
-declare module 'express' {
+/**
+ * Merges into Express's Request (sourced from `express-serve-static-core`)
+ * so `ts-node` and `tsc` both see `requestId` on `http.getRequest<Request>()`.
+ */
+declare module 'express-serve-static-core' {
   interface Request {
     /**
      * Correlation ID for this request. Populated by `RequestIdMiddleware`.

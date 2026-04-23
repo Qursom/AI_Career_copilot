@@ -16,6 +16,7 @@ import { LlmModule } from './llm/llm.module';
 import { ResumeModule } from './resume/resume.module';
 import { JobMatchModule } from './job-match/job-match.module';
 import { HealthModule } from './health/health.module';
+import { RagModule } from './rag/rag.module';
 
 const globals: Provider[] = [
   { provide: APP_FILTER, useClass: AllExceptionsFilter },
@@ -42,6 +43,7 @@ const globals: Provider[] = [
     ResumeModule,
     JobMatchModule,
     HealthModule,
+    RagModule,
   ],
   providers: globals,
 })

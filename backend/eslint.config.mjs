@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    // E2E uses Jest + supertest; keep them out of the `src` tsconfig project
+    // so `projectService` does not require a second tsconfig.
+    ignores: ['eslint.config.mjs', 'test/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

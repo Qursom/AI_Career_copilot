@@ -14,10 +14,7 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   }
 
   if (parsed.data.LLM_PROVIDER === 'gemini' && !parsed.data.GEMINI_API_KEY) {
-    throw new Error(
-      'LLM_PROVIDER=gemini requires GEMINI_API_KEY to be set.',
-    );
+    throw new Error('LLM_PROVIDER=gemini requires GEMINI_API_KEY to be set.');
   }
-
   return parsed.data;
 }

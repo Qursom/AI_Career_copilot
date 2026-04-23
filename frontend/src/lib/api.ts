@@ -42,6 +42,7 @@ export interface HealthStatus {
   uptime: number;
   timestamp: string;
   llmProvider: string;
+  llmProviderEnv: string;
 }
 
 export interface ResumeAnalysis {
@@ -49,6 +50,9 @@ export interface ResumeAnalysis {
   strengths: string[];
   improvements: string[];
   missingSkills: string[];
+  marketSignals: string[];
+  priorityGaps: string[];
+  citations: string[];
   optimized: string;
   atsScore: number;
   atsNotes: string;
@@ -63,6 +67,9 @@ export interface MatchResult {
   score: number;
   strengths: string[];
   gaps: string[];
+  marketSignals: string[];
+  priorityGaps: string[];
+  citations: string[];
   suggestions: string[];
 }
 

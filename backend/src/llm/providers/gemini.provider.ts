@@ -1,9 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
-import type {
-  GenerateStructuredArgs,
-  LlmProvider,
-} from '../llm.interface';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { GenerateStructuredArgs, LlmProvider } from '../llm.interface';
 import {
   LlmInvalidOutputError,
   LlmTimeoutError,
@@ -23,17 +20,12 @@ export interface GeminiProviderOptions {
 export class GeminiProvider implements LlmProvider {
   readonly name = 'gemini';
   private readonly logger = new Logger(GeminiProvider.name);
-  private readonly model: GenerativeModel;
+  private readonly client: GoogleGenerativeAI;
+  private readonly modelName: string;
 
   constructor(private readonly opts: GeminiProviderOptions) {
-    const client = new GoogleGenerativeAI(opts.apiKey);
-    this.model = client.getGenerativeModel({
-      model: opts.model,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.6,
-      },
-    });
+    this.client = new GoogleGenerativeAI(opts.apiKey);
+    this.modelName = opts.model;
   }
 
   async generateStructured<T>({
@@ -47,15 +39,24 @@ export class GeminiProvider implements LlmProvider {
       `gemini.generateStructured model=${this.opts.model} timeout=${effectiveTimeout}ms input=${prompt.length} chars`,
     );
 
-    const call = this.model.generateContent({
+    const model = this.client.getGenerativeModel({
+      model: this.modelName,
+      systemInstruction: system,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.45,
+      },
+    });
+
+    const call = model.generateContent({
       contents: [
         {
           role: 'user',
           parts: [
             {
               text:
-                `SYSTEM INSTRUCTIONS:\n${system}\n\n` +
                 `Return ONLY a JSON object matching the expected shape. ` +
+                `Use the exact key names from the instructions. ` +
                 `No preamble, no markdown fences.\n\n` +
                 `USER INPUT:\n${prompt}`,
             },
@@ -67,12 +68,27 @@ export class GeminiProvider implements LlmProvider {
     let raw: string;
     try {
       const result = await withTimeout(call, effectiveTimeout);
-      raw = result.response.text();
+      try {
+        raw = result.response.text();
+      } catch (textErr) {
+        throw new LlmUpstreamError(
+          `Gemini call failed: ${textErr instanceof Error ? textErr.message : String(textErr)}`,
+          textErr,
+        );
+      }
     } catch (err) {
       if (err instanceof LlmTimeoutError) throw err;
+      if (err instanceof LlmUpstreamError) throw err;
       throw new LlmUpstreamError(
         `Gemini call failed: ${err instanceof Error ? err.message : String(err)}`,
         err,
+      );
+    }
+
+    if (!raw || !String(raw).trim()) {
+      throw new LlmInvalidOutputError(
+        'Gemini returned empty text. The response may be blocked or the model had no output.',
+        raw,
       );
     }
 

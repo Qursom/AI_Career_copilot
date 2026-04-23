@@ -35,6 +35,28 @@ export class ResumeAnalysisDto {
   missingSkills!: string[];
 
   @ApiProperty({
+    description:
+      'Retrieved labor-market signals that support role-specific recommendations.',
+    type: [String],
+    required: false,
+  })
+  marketSignals!: string[];
+
+  @ApiProperty({
+    description: 'Priority role gaps grounded in retrieved dataset evidence.',
+    type: [String],
+    required: false,
+  })
+  priorityGaps!: string[];
+
+  @ApiProperty({
+    description: 'Sources used to ground market-aware skill guidance.',
+    type: [String],
+    required: false,
+  })
+  citations!: string[];
+
+  @ApiProperty({
     description: 'Rewritten, ATS-friendly version of the key bullets.',
   })
   optimized!: string;

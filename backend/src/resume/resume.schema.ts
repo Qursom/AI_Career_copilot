@@ -1,28 +1,21 @@
 import { z } from 'zod';
+import { zProse, zScore0to100, zStringList } from '../common/zod-llm-json';
 
 /**
- * Trimmed, de-duplicated, non-empty string list with a sane upper bound.
- * Rejects arrays that collapse to zero useful entries so the UI never shows
- * an empty "Strengths" section.
+ * Trimmed, de-duplicated string list. Per-item min length is 1 so Gemini
+ * cannot fail on a single short chip like "AI" or "CI/CD".
  */
-const bulletList = (min: number, max: number) =>
-  z
-    .array(z.string().min(3).max(400))
-    .transform((arr) =>
-      Array.from(
-        new Set(arr.map((s) => s.trim()).filter((s) => s.length > 0)),
-      ),
-    )
-    .pipe(z.array(z.string()).min(min).max(max));
-
 export const ResumeAnalysisSchema = z.object({
-  roast: z.string().min(20).max(4_000),
-  strengths: bulletList(1, 10),
-  improvements: bulletList(1, 10),
-  missingSkills: bulletList(0, 15),
-  optimized: z.string().min(20).max(8_000),
-  atsScore: z.number().int().min(0).max(100),
-  atsNotes: z.string().min(10).max(4_000),
+  roast: zProse(20, 4_000),
+  strengths: zStringList(1, 10),
+  improvements: zStringList(1, 10),
+  missingSkills: zStringList(0, 15),
+  marketSignals: zStringList(0, 10).default([]),
+  priorityGaps: zStringList(0, 10).default([]),
+  citations: zStringList(0, 10).default([]),
+  optimized: zProse(20, 8_000),
+  atsScore: zScore0to100,
+  atsNotes: zProse(10, 4_000),
 });
 
 export type ResumeAnalysis = z.infer<typeof ResumeAnalysisSchema>;

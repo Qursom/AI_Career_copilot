@@ -8,7 +8,10 @@ export interface HealthReport {
   version: string;
   uptime: number;
   timestamp: string;
+  /** Which provider implementation is active (openai, gemini, mock). */
   llmProvider: string;
+  /** Value of `LLM_PROVIDER` in env; if it differs from `llmProvider`, a key was missing and mock was used. */
+  llmProviderEnv: string;
 }
 
 @Injectable()
@@ -28,6 +31,7 @@ export class HealthService {
       uptime: (Date.now() - this.startedAt) / 1000,
       timestamp: new Date().toISOString(),
       llmProvider: this.llm.providerName,
+      llmProviderEnv: this.config.get('LLM_PROVIDER'),
     };
   }
 }
