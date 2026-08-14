@@ -85,7 +85,7 @@ describe('JobMatchService', () => {
     expect(capturedPrompt).toContain('RAG EVIDENCE');
   });
 
-  it('when provider is openai, prefers LLM RAG fields over stub', async () => {
+  it('when provider is gemini, prefers LLM RAG fields over stub', async () => {
     const fake = {
       score: 80,
       strengths: ['a'],
@@ -96,7 +96,7 @@ describe('JobMatchService', () => {
       suggestions: ['s'],
     };
     const svc = await buildService(jest.fn().mockResolvedValue(fake), {
-      providerName: 'openai',
+      providerName: 'gemini',
     });
     await expect(svc.score(input)).resolves.toEqual(fake);
   });

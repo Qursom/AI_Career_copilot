@@ -8,10 +8,12 @@ export interface HealthReport {
   version: string;
   uptime: number;
   timestamp: string;
-  /** Which provider implementation is active (openai, gemini, mock). */
+  /** Which provider implementation is active (`gemini` or `mock`). */
   llmProvider: string;
   /** Value of `LLM_PROVIDER` in env; if it differs from `llmProvider`, a key was missing and mock was used. */
   llmProviderEnv: string;
+  /** `RAG_ENABLED` flag. Retrieval is empty until a vector store is wired. */
+  ragEnabled: boolean;
 }
 
 @Injectable()
@@ -32,6 +34,7 @@ export class HealthService {
       timestamp: new Date().toISOString(),
       llmProvider: this.llm.providerName,
       llmProviderEnv: this.config.get('LLM_PROVIDER'),
+      ragEnabled: this.config.get('RAG_ENABLED'),
     };
   }
 }

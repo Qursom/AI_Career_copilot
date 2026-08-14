@@ -19,7 +19,8 @@ export class HealthController {
   @SkipThrottle()
   @ApiOperation({
     summary: 'Health check',
-    description: 'Returns process uptime, env, and active LLM provider.',
+    description:
+      'Returns process uptime, env, active LLM provider (mock or gemini), and RAG enabled flag.',
   })
   check(): HealthReport {
     return this.service.check();

@@ -36,7 +36,7 @@ export class ResumeAnalysisDto {
 
   @ApiProperty({
     description:
-      'Retrieved labor-market signals that support role-specific recommendations.',
+      'Labor-market signals when retrieval is available; empty until a vector store is wired.',
     type: [String],
     required: false,
   })

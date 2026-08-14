@@ -70,7 +70,7 @@ async function bootstrap(): Promise<void> {
     const swaggerDoc = new DocumentBuilder()
       .setTitle('AI Career Copilot API')
       .setDescription(
-        'Resume analysis, job match scoring, and health endpoints.',
+        'Resume analysis, job match scoring, and health endpoints. LLM: mock or gemini. RAG returns empty context until a vector store is wired.',
       )
       .setVersion('1.0')
       .addServer(`/${config.get('API_PREFIX')}`)

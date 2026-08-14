@@ -6,9 +6,7 @@ describe('userMessageForUpstreamError', () => {
     const err = new LlmUpstreamError(
       'Gemini call failed: Error fetching from https://...: [403 ] API key not valid',
     );
-    expect(userMessageForUpstreamError(err)).toMatch(
-      /api key|GEMINI|OpenAI|Google/i,
-    );
+    expect(userMessageForUpstreamError(err)).toMatch(/api key|GEMINI|Google/i);
   });
 
   it('maps model 404', () => {

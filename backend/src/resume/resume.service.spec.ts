@@ -92,7 +92,7 @@ describe('ResumeService', () => {
     expect(capturedPrompt).toContain('RAG EVIDENCE');
   });
 
-  it('when provider is openai, prefers LLM marketSignals, priorityGaps, citations', async () => {
+  it('when provider is gemini, prefers LLM marketSignals, priorityGaps, citations', async () => {
     const fake = {
       roast: 'x'.repeat(30),
       strengths: ['a'],
@@ -106,7 +106,7 @@ describe('ResumeService', () => {
       atsNotes: 'Notes that are long enough to pass validation.',
     };
     const llmCall = jest.fn().mockResolvedValue(fake);
-    const { service } = await buildService(llmCall, { providerName: 'openai' });
+    const { service } = await buildService(llmCall, { providerName: 'gemini' });
     await expect(service.analyze(validInput)).resolves.toEqual(fake);
   });
 
@@ -142,7 +142,10 @@ describe('ResumeService', () => {
       ],
     })
       .overrideProvider(LlmService)
-      .useValue({ providerName: 'mock', generateStructured: jest.fn().mockResolvedValue(fake) })
+      .useValue({
+        providerName: 'mock',
+        generateStructured: jest.fn().mockResolvedValue(fake),
+      })
       .compile();
     const service = module.get(ResumeService);
     await expect(service.analyze(validInput)).resolves.toEqual(fake);

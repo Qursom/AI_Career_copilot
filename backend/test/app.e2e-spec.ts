@@ -54,6 +54,7 @@ describe('API (e2e)', () => {
         expect(res.body.data.status).toBe('ok');
         expect(res.body.data.llmProvider).toBe('mock');
         expect(res.body.data.llmProviderEnv).toBe('mock');
+        expect(typeof res.body.data.ragEnabled).toBe('boolean');
       });
   });
 

@@ -19,7 +19,8 @@ export class MatchResultDto {
 
   @ApiProperty({
     type: [String],
-    description: 'Retrieved market signals used to ground fit evaluation.',
+    description:
+      'Retrieved market signals used to ground fit evaluation (empty until a vector store is wired).',
     required: false,
   })
   marketSignals!: string[];

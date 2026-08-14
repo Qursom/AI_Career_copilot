@@ -2,9 +2,9 @@ import { mergeMockWithRagFields } from './merge-mock-rag';
 
 describe('mergeMockWithRagFields', () => {
   const rag = {
-    marketSignals: ['from pinecone a'],
-    priorityGaps: ['from pinecone b'],
-    citations: ['from pinecone c'],
+    marketSignals: ['from retrieval a'],
+    priorityGaps: ['from retrieval b'],
+    citations: ['from retrieval c'],
   };
   const llm = {
     marketSignals: ['from mock'],
@@ -17,12 +17,12 @@ describe('mergeMockWithRagFields', () => {
   });
 
   it('uses LLM when provider is not mock and LLM has values', () => {
-    expect(mergeMockWithRagFields('openai', rag, llm)).toEqual(llm);
+    expect(mergeMockWithRagFields('gemini', rag, llm)).toEqual(llm);
   });
 
-  it('prefers RAG for empty LLM when provider is openai', () => {
+  it('prefers RAG for empty LLM when provider is gemini', () => {
     const emptyLlm = { marketSignals: [], priorityGaps: [], citations: [] };
-    expect(mergeMockWithRagFields('openai', rag, emptyLlm)).toEqual(rag);
+    expect(mergeMockWithRagFields('gemini', rag, emptyLlm)).toEqual(rag);
   });
 
   it('uses LLM for mock when RAG is fully empty', () => {

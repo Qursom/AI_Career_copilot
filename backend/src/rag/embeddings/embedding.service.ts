@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { EmbeddingProvider } from './embedding.interface';
-import { RAG_EMBEDDING_PROVIDER } from '../rag.tokens.js';
+import { RAG_EMBEDDING_PROVIDER } from '../rag.tokens';
 
 @Injectable()
 export class EmbeddingService {

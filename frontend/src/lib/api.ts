@@ -43,6 +43,7 @@ export interface HealthStatus {
   timestamp: string;
   llmProvider: string;
   llmProviderEnv: string;
+  ragEnabled: boolean;
 }
 
 export interface ResumeAnalysis {

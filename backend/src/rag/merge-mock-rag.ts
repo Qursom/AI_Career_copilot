@@ -7,7 +7,7 @@ export type RagSlice = Pick<
 
 /**
  * When the active LLM is `mock`, it always returns non-empty RAG-like arrays from
- * heuristics, which previously hid real Pinecone retrieval. If retrieval produced
+ * heuristics, which previously hid real retrieval. If retrieval produced
  * evidence, prefer those fields for display accuracy.
  */
 export function mergeMockWithRagFields(
@@ -36,9 +36,7 @@ export function mergeMockWithRagFields(
     marketSignals: llm.marketSignals.length
       ? llm.marketSignals
       : rag.marketSignals,
-    priorityGaps: llm.priorityGaps.length
-      ? llm.priorityGaps
-      : rag.priorityGaps,
+    priorityGaps: llm.priorityGaps.length ? llm.priorityGaps : rag.priorityGaps,
     citations: llm.citations.length ? llm.citations : rag.citations,
   };
 }
