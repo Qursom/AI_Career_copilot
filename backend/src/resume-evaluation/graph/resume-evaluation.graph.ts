@@ -7,71 +7,20 @@ import { VerdictService } from '../services/verdict.service';
 import { ResumeEvaluationState, type ResumeEvaluationStateType } from '../state';
 import { ParsedResumeSchema, ParsedJobSchema, ResumeEvaluationSchema, CoverLetterEvaluationSchema, ResumeEvaluationResultSchema, QuickFixSchema } from '../schemas';
 
+export const coverLetterRoute = (s: Pick<ResumeEvaluationStateType, 'coverLetter'>) => s.coverLetter ? 'evaluateCoverLetter' : 'calculateVerdict';
 const parserRules = 'Use only source text. Never invent facts. Return structured output only.';
 const parseResume = async (s: ResumeEvaluationStateType, models: ModelFactory) => ({ parsedResume: await models.getChatModel(.05).withStructuredOutput(ParsedResumeSchema, { name: 'parse_resume', strict: true }).invoke(`You are an information extraction engine. ${parserRules}\nRESUME:\n${s.resumeText}`) });
 const parseJob = async (s: ResumeEvaluationStateType, models: ModelFactory) => ({ parsedJob: await models.getChatModel(.05).withStructuredOutput(ParsedJobSchema, { name: 'parse_job', strict: true }).invoke(`You extract hiring requirements. ${parserRules}\nJOB DESCRIPTION:\n${s.jobDescription}`) });
 
 export function buildResumeEvaluationGraph(deps: { models: ModelFactory; rag: PineconeRetrievalService; comparison: CandidateComparisonService; verdict: VerdictService }) {
-  const validateInput = (s: ResumeEvaluationStateType) => {
-    if (s.resumeText.length < 50 || s.resumeText.length > 20000) throw new Error('Resume must be 50-20,000 characters.');
-    if (s.jobDescription.length < 50 || s.jobDescription.length > 20000) throw new Error('Job description must be 50-20,000 characters.');
-    if (s.coverLetter && s.coverLetter.length > 10000) throw new Error('Cover letter must be at most 10,000 characters.');
-    if (s.targetRole && s.targetRole.length > 120) throw new Error('Target role must be at most 120 characters.');
-    return {};
-  };
-  const buildRagQuery = (s: ResumeEvaluationStateType) => ({ ragQuery: [`Target role: ${s.parsedJob?.role ?? s.targetRole ?? 'unknown'}`, `Seniority: ${s.parsedJob?.seniority ?? ''}`, `Required skills: ${(s.parsedJob?.requiredSkills ?? []).join(', ')}`, `Candidate skills: ${(s.parsedResume?.skills ?? []).join(', ')}`, `Candidate gaps: ${(s.comparison?.missingRequiredSkills ?? []).join(', ')}`, 'Retrieve hiring-market evidence, ATS signals and skills expected for this role.'].join('\n') });
-  const retrieveContext = async (s: ResumeEvaluationStateType) => {
-    const docs = await deps.rag.retrieve(s.ragQuery ?? '');
-    return { ragDocuments: docs, marketSignals: docs.slice(0, 5).map(d => d.content.slice(0, 240)), priorityGaps: (s.comparison?.missingRequiredSkills ?? []).slice(0, 6) };
-  };
-  const analyzeCandidate = (s: ResumeEvaluationStateType) => ({ comparison: deps.comparison.compare(s.parsedResume!, s.parsedJob!), candidateSkills: s.parsedResume!.skills, requiredSkills: s.parsedJob!.requiredSkills });
-  const evaluateResume = async (s: ResumeEvaluationStateType) => {
-    const context = (s.ragDocuments ?? []).slice(0, 6).map(d => `[${d.score.toFixed(2)}] ${d.content}`).join('\n');
-    const input = `CANDIDATE PARSED DATA:\n${JSON.stringify(s.parsedResume)}\nJOB REQUIREMENTS:\n${JSON.stringify(s.parsedJob)}\nDETERMINISTIC COMPARISON:\n${JSON.stringify(s.comparison)}\nMARKET CONTEXT (supporting evidence only):\n${context}`;
-    return { resumeEvaluation: await deps.models.getChatModel(.1).withStructuredOutput(ResumeEvaluationSchema, { name: 'evaluate_resume', strict: true }).invoke(`You are a senior technical recruiter and ATS specialist. Evaluate only this candidate for this job. Candidate claims must originate in the parsed resume. ${input}`) };
-  };
-  const evaluateCoverLetter = async (s: ResumeEvaluationStateType) => {
-    if (!s.coverLetter) return {};
-    return { coverLetterEvaluation: await deps.models.getChatModel(.1).withStructuredOutput(CoverLetterEvaluationSchema, { name: 'evaluate_cover_letter', strict: true }).invoke(`You are an experienced technical recruiter. Evaluate this cover letter against the job requirements and candidate summary. Never invent achievements.\nJOB: ${JSON.stringify(s.parsedJob)}\nCANDIDATE: ${JSON.stringify(s.parsedResume?.summary)}\nCOVER LETTER:\n${s.coverLetter}`) };
-  };
-  const calculateVerdict = (s: ResumeEvaluationStateType) => {
-    const v = deps.verdict.calculate({ resume: s.resumeEvaluation!, requiredMatched: s.comparison!.matchedRequiredSkills, requiredMissing: s.comparison!.missingRequiredSkills, keywordCoverage: s.comparison!.keywordCoverage, experienceAlignment: s.comparison!.experienceAlignment, coverLetter: s.coverLetterEvaluation, minimumExperienceRequired: s.parsedJob?.minimumExperience ?? undefined, candidateYears: s.parsedResume?.yearsOfExperience });
-    return { finalResult: { verdict: v.verdict, overallScore: v.overallScore, confidence: v.confidence, summary: v.reasons.length ? v.reasons.join('; ') : 'Strong overall alignment based on the deterministic score.', resume: { score: s.resumeEvaluation!.score, atsScore: s.resumeEvaluation!.atsScore, strengths: s.resumeEvaluation!.strengths, weaknesses: s.resumeEvaluation!.weaknesses, missingSkills: s.resumeEvaluation!.missingSkills, missingKeywords: s.resumeEvaluation!.missingKeywords, atsIssues: s.resumeEvaluation!.atsIssues }, coverLetter: s.coverLetterEvaluation ? { score: s.coverLetterEvaluation.score, strengths: s.coverLetterEvaluation.strengths, weaknesses: s.coverLetterEvaluation.weaknesses, issues: s.coverLetterEvaluation.issues } : undefined, match: { requiredSkillsMatched: s.comparison!.matchedRequiredSkills, requiredSkillsMissing: s.comparison!.missingRequiredSkills, preferredSkillsMatched: s.comparison!.matchedPreferredSkills, keywordCoverage: s.comparison!.keywordCoverage, experienceAlignment: s.comparison!.experienceAlignment }, marketSignals: s.marketSignals ?? [], priorityGaps: s.priorityGaps ?? s.comparison!.missingRequiredSkills, recruiterPerspective: '', quickFixes: [], citations: (s.ragDocuments ?? []).slice(0,4).map(d => ({ title: d.metadata.sourceName ?? d.metadata.title ?? 'Market evidence', url: d.metadata.sourceUrl ?? d.metadata.url, evidence: d.content.slice(0, 300) })) } };
-  };
-  const generateQuickFixes = async (s: ResumeEvaluationStateType) => {
-    const schema = z.object({ quickFixes: z.array(QuickFixSchema).max(10) });
-    const r = await deps.models.getChatModel(.2).withStructuredOutput(schema, { name: 'generate_quick_fixes', strict: true }).invoke(`Generate actionable edits using only evidence from the parsed resume and evaluations. Never add unsupported skills, employers, metrics or achievements. Before/after text must be grounded.\nRESUME: ${JSON.stringify(s.parsedResume)}\nJOB: ${JSON.stringify(s.parsedJob)}\nEVALUATION: ${JSON.stringify(s.resumeEvaluation)}\nCOVER: ${JSON.stringify(s.coverLetterEvaluation)}`);
-    return { finalResult: { ...s.finalResult!, quickFixes: r.quickFixes } };
-  };
-  const finalize = async (s: ResumeEvaluationStateType) => {
-    const schema = z.object({ summary: z.string(), recruiterPerspective: z.string() });
-    const r = await deps.models.getChatModel(.15).withStructuredOutput(schema, { name: 'finalize_evaluation', strict: true }).invoke(`Use only previous workflow evidence. No new candidate facts. Produce a concise recruiter summary and perspective.\nRESULT: ${JSON.stringify(s.finalResult)}`);
-    return { finalResult: ResumeEvaluationResultSchema.parse({ ...s.finalResult!, summary: r.summary, recruiterPerspective: r.recruiterPerspective }) };
-  };
-  const graph = new StateGraph(ResumeEvaluationState)
-    .addNode('validateInput', validateInput)
-    .addNode('parseResume', (s) => parseResume(s, deps.models))
-    .addNode('parseJobDescription', (s) => parseJob(s, deps.models))
-    .addNode('buildRagQuery', buildRagQuery)
-    .addNode('retrieveContext', retrieveContext)
-    .addNode('analyzeCandidate', analyzeCandidate)
-    .addNode('evaluateResume', evaluateResume)
-    .addNode('evaluateCoverLetter', evaluateCoverLetter)
-    .addNode('calculateVerdict', calculateVerdict)
-    .addNode('generateQuickFixes', generateQuickFixes)
-    .addNode('finalize', finalize)
-    .addEdge(START, 'validateInput')
-    .addEdge('validateInput', 'parseResume')
-    .addEdge('validateInput', 'parseJobDescription')
-    .addEdge('parseResume', 'buildRagQuery')
-    .addEdge('parseJobDescription', 'buildRagQuery')
-    .addEdge('buildRagQuery', 'retrieveContext')
-    .addEdge('retrieveContext', 'analyzeCandidate')
-    .addEdge('analyzeCandidate', 'evaluateResume')
-    .addConditionalEdges('evaluateResume', (s) => s.coverLetter ? 'evaluateCoverLetter' : 'calculateVerdict', ['evaluateCoverLetter', 'calculateVerdict'])
-    .addEdge('evaluateCoverLetter', 'calculateVerdict')
-    .addEdge('calculateVerdict', 'generateQuickFixes')
-    .addEdge('generateQuickFixes', 'finalize')
-    .addEdge('finalize', END);
-  return graph.compile();
+  const validateInput = (s: ResumeEvaluationStateType) => { if(s.resumeText.length<50||s.resumeText.length>20000) throw new Error('Resume must be 50-20,000 characters.'); if(s.jobDescription.length<50||s.jobDescription.length>20000) throw new Error('Job description must be 50-20,000 characters.'); if(s.coverLetter&&s.coverLetter.length>10000) throw new Error('Cover letter must be at most 10,000 characters.'); if(s.targetRole&&s.targetRole.length>120) throw new Error('Target role must be at most 120 characters.'); return {}; };
+  const buildRagQuery = (s: ResumeEvaluationStateType) => ({ ragQuery: [`Target role: ${s.parsedJob?.role ?? s.targetRole ?? 'unknown'}`,`Seniority: ${s.parsedJob?.seniority ?? ''}`,`Required skills: ${(s.parsedJob?.requiredSkills??[]).join(', ')}`,`Candidate skills: ${(s.parsedResume?.skills??[]).join(', ')}`,'Retrieve hiring-market evidence, ATS signals and skills expected for this role.'].join('\n') });
+  const retrieveContext = async (s: ResumeEvaluationStateType) => { const docs=await deps.rag.retrieve(s.ragQuery??''); return {ragDocuments:docs,marketSignals:docs.slice(0,5).map(d=>d.content.slice(0,240)),priorityGaps:(s.parsedJob?.requiredSkills??[]).filter(x=>!(s.parsedResume?.skills??[]).some(c=>c.toLowerCase()===x.toLowerCase())).slice(0,6)}; };
+  const analyzeCandidate = (s: ResumeEvaluationStateType) => ({ comparison: deps.comparison.compare(s.parsedResume!,s.parsedJob!),candidateSkills:s.parsedResume!.skills,requiredSkills:s.parsedJob!.requiredSkills });
+  const evaluateResume = async (s: ResumeEvaluationStateType) => { const context=(s.ragDocuments??[]).slice(0,6).map(d=>`[${d.score.toFixed(2)}] ${d.content}`).join('\n'); return {resumeEvaluation:await deps.models.getChatModel(.1).withStructuredOutput(ResumeEvaluationSchema,{name:'evaluate_resume',strict:true}).invoke(`You are a senior technical recruiter and ATS specialist. Evaluate only this candidate for this job. Candidate claims must originate in the parsed resume.\nCANDIDATE:${JSON.stringify(s.parsedResume)}\nJOB:${JSON.stringify(s.parsedJob)}\nCOMPARISON:${JSON.stringify(s.comparison)}\nMARKET CONTEXT:${context}`)}; };
+  const evaluateCoverLetter = async (s: ResumeEvaluationStateType) => !s.coverLetter ? {} : {coverLetterEvaluation:await deps.models.getChatModel(.1).withStructuredOutput(CoverLetterEvaluationSchema,{name:'evaluate_cover_letter',strict:true}).invoke(`You are an experienced technical recruiter. Never invent achievements.\nJOB:${JSON.stringify(s.parsedJob)}\nCANDIDATE:${JSON.stringify(s.parsedResume?.summary)}\nCOVER LETTER:\n${s.coverLetter}`)};
+  const calculateVerdict = (s: ResumeEvaluationStateType) => { const v=deps.verdict.calculate({resume:s.resumeEvaluation!,requiredMatched:s.comparison!.matchedRequiredSkills,requiredMissing:s.comparison!.missingRequiredSkills,keywordCoverage:s.comparison!.keywordCoverage,experienceAlignment:s.comparison!.experienceAlignment,coverLetter:s.coverLetterEvaluation,minimumExperienceRequired:s.parsedJob?.minimumExperience??undefined,candidateYears:s.parsedResume?.yearsOfExperience}); return {finalResult:{verdict:v.verdict,overallScore:v.overallScore,confidence:v.confidence,summary:v.reasons.length?v.reasons.join('; '):'Strong overall alignment based on the deterministic score.',resume:{score:s.resumeEvaluation!.score,atsScore:s.resumeEvaluation!.atsScore,strengths:s.resumeEvaluation!.strengths,weaknesses:s.resumeEvaluation!.weaknesses,missingSkills:s.resumeEvaluation!.missingSkills,missingKeywords:s.resumeEvaluation!.missingKeywords,atsIssues:s.resumeEvaluation!.atsIssues},coverLetter:s.coverLetterEvaluation?{score:s.coverLetterEvaluation.score,strengths:s.coverLetterEvaluation.strengths,weaknesses:s.coverLetterEvaluation.weaknesses,issues:s.coverLetterEvaluation.issues}:undefined,match:{requiredSkillsMatched:s.comparison!.matchedRequiredSkills,requiredSkillsMissing:s.comparison!.missingRequiredSkills,preferredSkillsMatched:s.comparison!.matchedPreferredSkills,keywordCoverage:s.comparison!.keywordCoverage,experienceAlignment:s.comparison!.experienceAlignment},marketSignals:s.marketSignals??[],priorityGaps:s.priorityGaps??s.comparison!.missingRequiredSkills,recruiterPerspective:'',quickFixes:[],citations:(s.ragDocuments??[]).slice(0,4).map(d=>({title:d.metadata.sourceName??d.metadata.title??'Market evidence',url:d.metadata.sourceUrl??d.metadata.url,evidence:d.content.slice(0,300)}))}}; };
+  const generateQuickFixes = async (s: ResumeEvaluationStateType) => { const schema=z.object({quickFixes:z.array(QuickFixSchema).max(10)}); const r=await deps.models.getChatModel(.2).withStructuredOutput(schema,{name:'generate_quick_fixes',strict:true}).invoke(`Generate actionable edits using only evidence from the parsed resume and evaluations. Never add unsupported skills, employers, metrics or achievements.\nRESUME:${JSON.stringify(s.parsedResume)}\nJOB:${JSON.stringify(s.parsedJob)}\nEVALUATION:${JSON.stringify(s.resumeEvaluation)}\nCOVER:${JSON.stringify(s.coverLetterEvaluation)}`); return {finalResult:{...s.finalResult!,quickFixes:r.quickFixes}}; };
+  const finalize = async (s: ResumeEvaluationStateType) => { const schema=z.object({summary:z.string(),recruiterPerspective:z.string()}); const r=await deps.models.getChatModel(.15).withStructuredOutput(schema,{name:'finalize_evaluation',strict:true}).invoke(`Use only previous workflow evidence. No new candidate facts. Produce a concise recruiter summary and perspective.\nRESULT:${JSON.stringify(s.finalResult)}`); return {finalResult:ResumeEvaluationResultSchema.parse({...s.finalResult!,summary:r.summary,recruiterPerspective:r.recruiterPerspective})}; };
+  return new StateGraph(ResumeEvaluationState).addNode('validateInput',validateInput).addNode('parseResume',s=>parseResume(s,deps.models)).addNode('parseJobDescription',s=>parseJob(s,deps.models)).addNode('buildRagQuery',buildRagQuery).addNode('retrieveContext',retrieveContext).addNode('analyzeCandidate',analyzeCandidate).addNode('evaluateResume',evaluateResume).addNode('evaluateCoverLetter',evaluateCoverLetter).addNode('calculateVerdict',calculateVerdict).addNode('generateQuickFixes',generateQuickFixes).addNode('finalize',finalize).addEdge(START,'validateInput').addEdge('validateInput','parseResume').addEdge('validateInput','parseJobDescription').addEdge('parseResume','buildRagQuery').addEdge('parseJobDescription','buildRagQuery').addEdge('buildRagQuery','retrieveContext').addEdge('retrieveContext','analyzeCandidate').addEdge('analyzeCandidate','evaluateResume').addConditionalEdges('evaluateResume',coverLetterRoute,['evaluateCoverLetter','calculateVerdict']).addEdge('evaluateCoverLetter','calculateVerdict').addEdge('calculateVerdict','generateQuickFixes').addEdge('generateQuickFixes','finalize').addEdge('finalize',END).compile();
 }
