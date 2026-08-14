@@ -1,9 +1,4 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  type Provider,
-} from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, type Provider } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypedConfigModule } from './config/typed-config.module';
@@ -17,6 +12,7 @@ import { ResumeModule } from './resume/resume.module';
 import { JobMatchModule } from './job-match/job-match.module';
 import { HealthModule } from './health/health.module';
 import { RagModule } from './rag/rag.module';
+import { ResumeEvaluationModule } from './resume-evaluation/resume-evaluation.module';
 
 const globals: Provider[] = [
   { provide: APP_FILTER, useClass: AllExceptionsFilter },
@@ -26,29 +22,9 @@ const globals: Provider[] = [
 ];
 
 @Module({
-  imports: [
-    TypedConfigModule,
-    ThrottlerModule.forRootAsync({
-      inject: [TypedConfigService],
-      useFactory: (config: TypedConfigService) => ({
-        throttlers: [
-          {
-            ttl: config.get('THROTTLE_TTL_MS'),
-            limit: config.get('THROTTLE_LIMIT'),
-          },
-        ],
-      }),
-    }),
-    LlmModule,
-    ResumeModule,
-    JobMatchModule,
-    HealthModule,
-    RagModule,
-  ],
+  imports: [TypedConfigModule, ThrottlerModule.forRootAsync({ inject: [TypedConfigService], useFactory: (config: TypedConfigService) => ({ throttlers: [{ ttl: config.get('THROTTLE_TTL_MS'), limit: config.get('THROTTLE_LIMIT') }] }) }), LlmModule, ResumeModule, JobMatchModule, HealthModule, RagModule, ResumeEvaluationModule],
   providers: globals,
 })
 export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware).forRoutes('{*path}');
-  }
+  configure(consumer: MiddlewareConsumer): void { consumer.apply(RequestIdMiddleware).forRoutes('{*path}'); }
 }
