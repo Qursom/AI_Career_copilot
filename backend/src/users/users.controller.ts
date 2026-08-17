@@ -16,7 +16,7 @@ export class UsersController {
   ) {}
 
   @Get('me')
-  @ApiOperation({ summary: 'Current user profile and interview coin balance.' })
+  @ApiOperation({ summary: 'Current user profile and resume coin balance.' })
   async me(@CurrentUser() user: AuthUser) {
     const record = await this.users.ensureUser(user.userId, user.email);
     return {

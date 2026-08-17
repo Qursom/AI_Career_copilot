@@ -43,14 +43,14 @@ describe('AuthService', () => {
       name: 'Ada Lovelace',
       email: 'ada@example.com',
       photoUrl: 'https://example.com/ada.png',
-      interviewCoins: 150,
+      interviewCoins: 100,
     });
     const res = { cookie: jest.fn() } as unknown as Response;
 
     const out = await service.loginWithIdToken('firebase-id-token-value', res);
 
     expect(out.user.email).toBe('ada@example.com');
-    expect(out.user.interviewCoins).toBe(150);
+    expect(out.user.interviewCoins).toBe(100);
     expect(cache.setWithTtl).toHaveBeenCalled();
     expect(res.cookie).toHaveBeenCalledWith(
       'session_id',

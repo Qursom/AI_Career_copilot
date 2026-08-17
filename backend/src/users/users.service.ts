@@ -24,6 +24,7 @@ export class UsersService {
     );
   }
 
+  /** Sign-up creates the Mongo user at USER_STARTING_COINS; sign-in only loads it. */
   findOrCreate(input: UserProfileInput): Promise<UserRecord> {
     return this.store.findOrCreate(
       input,

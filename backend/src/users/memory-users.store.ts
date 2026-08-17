@@ -31,9 +31,6 @@ export class MemoryUsersStore implements UsersStore {
   ): Promise<UserRecord> {
     const existing = this.byUid.get(input.firebaseUid);
     if (existing) {
-      existing.email = input.email || existing.email;
-      if (input.name) existing.name = input.name;
-      if (input.photoUrl) existing.photoUrl = input.photoUrl;
       return Promise.resolve({ ...existing });
     }
     const created: UserRecord = {

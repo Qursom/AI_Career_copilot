@@ -86,7 +86,7 @@ export const EnvSchema = z.object({
   FIREBASE_PRIVATE_KEY: z.preprocess(emptyToUndef, z.string().min(1).optional()),
 
   RESUME_COIN_COST: z.coerce.number().int().positive().default(10),
-  USER_STARTING_COINS: z.coerce.number().int().nonnegative().default(150),
+  USER_STARTING_COINS: z.coerce.number().int().nonnegative().default(100),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

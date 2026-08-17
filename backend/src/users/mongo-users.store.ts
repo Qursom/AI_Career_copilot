@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserEntity, type UserDocument } from './user.schema';
@@ -11,6 +11,8 @@ import {
 
 @Injectable()
 export class MongoUsersStore implements UsersStore {
+  private readonly logger = new Logger(MongoUsersStore.name);
+
   constructor(
     @InjectModel(UserEntity.name) private readonly model: Model<UserDocument>,
   ) {}
@@ -38,21 +40,28 @@ export class MongoUsersStore implements UsersStore {
   ): Promise<UserRecord> {
     const existing = await this.model.findOne({ firebaseUid: input.firebaseUid });
     if (existing) {
-      existing.email = input.email.toLowerCase() || existing.email;
-      if (input.name) existing.name = input.name;
-      if (input.photoUrl) existing.photoUrl = input.photoUrl;
-      await existing.save();
+      this.logger.log(`Sign-in: loaded users.firebaseUid=${input.firebaseUid}`);
       return this.toRecord(existing);
     }
 
-    const created = await this.model.create({
-      firebaseUid: input.firebaseUid,
-      email: input.email.toLowerCase(),
-      name: input.name?.trim() || 'User',
-      photoUrl: input.photoUrl ?? '',
-      interviewCoins: startingCoins,
-    });
-    return this.toRecord(created);
+    try {
+      const created = await this.model.create({
+        firebaseUid: input.firebaseUid,
+        email: input.email.toLowerCase(),
+        name: input.name?.trim() || 'User',
+        photoUrl: input.photoUrl ?? '',
+        interviewCoins: startingCoins,
+      });
+      this.logger.log(
+        `Sign-up: created users.firebaseUid=${input.firebaseUid} coins=${startingCoins}`,
+      );
+      return this.toRecord(created);
+    } catch (err) {
+      if (!isDuplicateKey(err)) throw err;
+      const raced = await this.model.findOne({ firebaseUid: input.firebaseUid });
+      if (!raced) throw err;
+      return this.toRecord(raced);
+    }
   }
 
   async chargeCoins(firebaseUid: string, cost: number): Promise<UserRecord> {
@@ -78,4 +87,13 @@ export class MongoUsersStore implements UsersStore {
       interviewCoins: doc.interviewCoins,
     };
   }
+}
+
+function isDuplicateKey(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code: unknown }).code === 11000
+  );
 }

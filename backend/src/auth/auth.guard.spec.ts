@@ -31,7 +31,7 @@ describe('AuthGuard (session)', () => {
       name: 'Ada',
       email: 'a@b.c',
       photoUrl: '',
-      interviewCoins: 150,
+      interviewCoins: 100,
     });
     const guard = new AuthGuard(authService, {
       isProd: false,
