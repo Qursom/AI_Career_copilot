@@ -8,6 +8,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { TypedConfigService } from './config/typed-config.service';
@@ -35,6 +36,7 @@ async function bootstrap(): Promise<void> {
     helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }),
   );
   app.use(compression());
+  app.use(cookieParser());
 
   app.setGlobalPrefix(config.get('API_PREFIX'), {
     exclude: [],
@@ -48,7 +50,12 @@ async function bootstrap(): Promise<void> {
     origin: config.corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-Id',
+      'x-user-id',
+    ],
     exposedHeaders: ['X-Request-Id'],
     maxAge: 86_400,
   });
@@ -70,12 +77,15 @@ async function bootstrap(): Promise<void> {
     const swaggerDoc = new DocumentBuilder()
       .setTitle('AI Career Copilot API')
       .setDescription(
-        'Resume analysis, job match scoring, and health endpoints. LLM: mock or gemini. RAG returns empty context until a vector store is wired.',
+        'Resume analysis, job match scoring, and health endpoints. LLM: mock, gemini, or groq (LangChain ChatGroq). RAG uses Qdrant when QDRANT_URL is set.',
       )
       .setVersion('1.0')
       .addServer(`/${config.get('API_PREFIX')}`)
+      .addBearerAuth()
+      .addTag('auth')
       .addTag('resume')
       .addTag('job-match')
+      .addTag('users')
       .addTag('health')
       .build();
     const document = SwaggerModule.createDocument(app, swaggerDoc);

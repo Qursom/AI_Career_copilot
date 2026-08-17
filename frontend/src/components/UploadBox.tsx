@@ -4,7 +4,7 @@ import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
 import { extractResumeText } from "@/lib/extractText";
 
 type UploadBoxProps = {
-  onAnalyze?: (text: string) => void;
+  onAnalyze?: (payload: { text?: string; file?: File }) => void;
   isAnalyzing?: boolean;
 };
 
@@ -20,11 +20,15 @@ export default function UploadBox({
   const [fileName, setFileName] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const remaining = MAX_CHARS - text.length;
   const canAnalyze =
-    text.trim().length > 50 && !isAnalyzing && !isExtracting;
+    ((pdfFile && pdfFile.name.toLowerCase().endsWith(".pdf")) ||
+      text.trim().length > 50) &&
+    !isAnalyzing &&
+    !isExtracting;
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -35,6 +39,13 @@ export default function UploadBox({
     }
 
     setFileName(file.name);
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      setPdfFile(file);
+      setText("");
+      return;
+    }
+
+    setPdfFile(null);
     setIsExtracting(true);
     try {
       const content = await extractResumeText(file);
@@ -171,12 +182,18 @@ export default function UploadBox({
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-white/40">
-          Nothing is stored without your consent.
+          PDF uploads are parsed on the server. Costs 10 interview coins.
         </p>
         <button
           type="button"
           disabled={!canAnalyze}
-          onClick={() => onAnalyze?.(text)}
+          onClick={() =>
+            onAnalyze?.(
+              pdfFile
+                ? { file: pdfFile }
+                : { text },
+            )
+          }
           className="btn-primary"
         >
           {isAnalyzing ? (

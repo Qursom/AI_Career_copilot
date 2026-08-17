@@ -47,16 +47,28 @@ export interface HealthStatus {
 }
 
 export interface ResumeAnalysis {
+  fullName: string;
+  email: string;
+  phone: string;
+  summary: string;
+  skills: string[];
+  projects: string[];
+  experience: string[];
+  education: string[];
   roast: string;
   strengths: string[];
+  weaknesses: string[];
   improvements: string[];
+  recommendations: string[];
   missingSkills: string[];
+  suggestedJobRole: string;
   marketSignals: string[];
   priorityGaps: string[];
   citations: string[];
   optimized: string;
   atsScore: number;
   atsNotes: string;
+  interviewCoins?: number;
 }
 
 export interface AnalyzeResumeInput {
@@ -116,17 +128,63 @@ export class ApiError extends Error {
 
 // ---------- Core request function ----------
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export interface UserProfile {
+  id?: string;
+  userId: string;
+  name?: string;
+  email: string;
+  photoUrl?: string;
+  interviewCoins: number;
+  resumeCoinCost?: number;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  photoUrl: string;
+  interviewCoins: number;
+}
+
+export type AuthHeaders = {
+  token?: string;
+  userId?: string;
+};
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  auth?: AuthHeaders,
+): Promise<T> {
+  const isForm = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+  if (!isForm) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (auth?.token) {
+    headers.Authorization = `Bearer ${auth.token}`;
+  }
+  if (auth?.userId) {
+    headers["x-user-id"] = auth.userId;
+  }
+  const extra = init?.headers;
+  if (extra && extra instanceof Headers) {
+    extra.forEach((v, k) => {
+      headers[k] = v;
+    });
+  } else if (extra && !Array.isArray(extra)) {
+    Object.assign(headers, extra);
+  }
+
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        ...(init?.headers ?? {}),
-      },
+      headers,
       cache: "no-store",
+      credentials: "include",
     });
   } catch (err) {
     throw new ApiError({
@@ -134,8 +192,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       code: "NETWORK",
       message:
         err instanceof Error
-          ? `Cannot reach the API: ${err.message}`
-          : "Cannot reach the API.",
+          ? `Cannot reach the API at ${API_BASE_URL} (${err.message}). Start the backend with npm run dev or npm --prefix backend run start:dev.`
+          : `Cannot reach the API at ${API_BASE_URL}. Start the backend with npm run dev.`,
       requestId: "offline",
     });
   }
@@ -173,18 +231,57 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // ---------- Public API surface ----------
 
 export const api = {
-  getRoot: () => request<{ message: string }>("/"),
-  getHealth: () => request<HealthStatus>("/health"),
+  getRoot: (auth?: AuthHeaders) =>
+    request<{ message: string }>("/", undefined, auth),
+  getHealth: (auth?: AuthHeaders) => request<HealthStatus>("/health", undefined, auth),
 
-  analyzeResume: (input: AnalyzeResumeInput) =>
-    request<ResumeAnalysis>("/resume/analyze", {
+  loginWithIdToken: (idToken: string) =>
+    request<{ user: AuthUser }>("/auth/login", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify({ idToken }),
     }),
 
-  scoreJobMatch: (input: ScoreMatchInput) =>
-    request<MatchResult>("/job-match/score", {
+  authMe: () => request<{ user: AuthUser }>("/auth/me"),
+
+  logout: () =>
+    request<{ ok: true }>("/auth/logout", {
       method: "POST",
-      body: JSON.stringify(input),
     }),
+
+  getMe: (auth?: AuthHeaders) =>
+    request<UserProfile>("/users/me", undefined, auth),
+
+  getMyResume: (auth?: AuthHeaders) =>
+    request<ResumeAnalysis>("/resume/me", undefined, auth),
+
+  analyzeResume: (input: AnalyzeResumeInput, auth?: AuthHeaders) =>
+    request<ResumeAnalysis>(
+      "/resume/analyze",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+      auth,
+    ),
+
+  analyzeResumePdf: (file: File, role: string | undefined, auth?: AuthHeaders) => {
+    const body = new FormData();
+    body.append("file", file);
+    if (role) body.append("role", role);
+    return request<ResumeAnalysis>(
+      "/resume/analyze",
+      { method: "POST", body },
+      auth,
+    );
+  },
+
+  scoreJobMatch: (input: ScoreMatchInput, auth?: AuthHeaders) =>
+    request<MatchResult>(
+      "/job-match/score",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+      auth,
+    ),
 };

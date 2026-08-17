@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { HttpStatus, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import type { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
@@ -17,6 +18,7 @@ describe('API (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
     app.useGlobalPipes(
@@ -61,8 +63,9 @@ describe('API (e2e)', () => {
   it('POST /api/v1/resume/analyze validates input', () => {
     return request(app.getHttpServer())
       .post('/api/v1/resume/analyze')
+      .set('x-user-id', 'e2e-user')
       .send({ resume: 'too short' })
-      .expect(422)
+      .expect(400)
       .expect((res) => {
         expect(res.body.success).toBe(false);
         expect(res.body.error.code).toBeDefined();
@@ -72,6 +75,7 @@ describe('API (e2e)', () => {
   it('POST /api/v1/resume/analyze returns analysis envelope', () => {
     return request(app.getHttpServer())
       .post('/api/v1/resume/analyze')
+      .set('x-user-id', 'e2e-user')
       .send({
         resume:
           'Jane Doe. 5+ years of TypeScript and React. Shipped a design system used by six teams, owned a checkout rewrite, mentored three engineers.',
@@ -111,6 +115,7 @@ describe('API (e2e)', () => {
   it('rejects extra fields (forbidNonWhitelisted)', () => {
     return request(app.getHttpServer())
       .post('/api/v1/resume/analyze')
+      .set('x-user-id', 'e2e-user')
       .send({
         resume: 'x'.repeat(200),
         evil: 'yes',

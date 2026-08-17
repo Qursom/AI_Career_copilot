@@ -16,7 +16,7 @@ async function bootstrap(): Promise<void> {
     );
     if (result.upserted === 0) {
       console.warn(
-        '\n[RAG ingest] No vector store configured, skipping. Wire a vector DB before ingesting.\n',
+        '\n[RAG ingest] No vectors upserted. Set QDRANT_URL and run Docker Qdrant, then retry.\n',
       );
     }
   } finally {

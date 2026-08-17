@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 
 const NAV_LINKS = [
   { href: "/resume", label: "Resume Tools" },
@@ -13,6 +14,7 @@ const NAV_LINKS = [
 export default function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { session, logout } = useAuth();
 
   return (
     <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-[#05050a]/70 backdrop-blur-xl">
@@ -63,21 +65,19 @@ export default function Navbar() {
               </Link>
             );
           })}
-          <Link href="/resume" className="btn-primary ml-3">
-            Get started
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="w-4 h-4"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          {session ? (
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="ml-3 px-3 py-2 rounded-lg text-white/70 hover:text-white hover:bg-white/5"
             >
-              <path d="M5 12h14M13 5l7 7-7 7" />
-            </svg>
-          </Link>
+              Sign out
+            </button>
+          ) : (
+            <Link href="/login" className="btn-primary ml-3">
+              Sign in
+            </Link>
+          )}
         </div>
 
         <button
@@ -128,13 +128,26 @@ export default function Navbar() {
                 </Link>
               );
             })}
-            <Link
-              href="/resume"
-              onClick={() => setOpen(false)}
-              className="btn-primary mt-2"
-            >
-              Get started
-            </Link>
+            {session ? (
+              <button
+                type="button"
+                className="btn-primary mt-2"
+                onClick={() => {
+                  setOpen(false);
+                  void logout();
+                }}
+              >
+                Sign out
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="btn-primary mt-2"
+              >
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
       )}

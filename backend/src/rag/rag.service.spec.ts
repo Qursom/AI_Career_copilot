@@ -1,5 +1,7 @@
 import { RagService } from './rag.service';
 import type { TypedConfigService } from '../config/typed-config.service';
+import type { EmbeddingService } from './embeddings/embedding.service';
+import { NoopVectorStore } from './vector/noop-vector.store';
 
 describe('RagService', () => {
   const makeConfig = (overrides?: Partial<Record<string, unknown>>) =>
@@ -13,6 +15,10 @@ describe('RagService', () => {
         )[key],
     }) as unknown as TypedConfigService;
 
+  const embeddings = {
+    embedText: jest.fn().mockResolvedValue([]),
+  } as unknown as EmbeddingService;
+
   const empty = {
     promptContext: '',
     marketSignals: [],
@@ -21,7 +27,11 @@ describe('RagService', () => {
   };
 
   it('returns empty context when disabled', async () => {
-    const service = new RagService(makeConfig({ RAG_ENABLED: false }));
+    const service = new RagService(
+      makeConfig({ RAG_ENABLED: false }),
+      embeddings,
+      new NoopVectorStore(),
+    );
 
     await expect(
       service.buildResumeContext({ resume: 'text', role: 'Backend Engineer' }),
@@ -29,7 +39,11 @@ describe('RagService', () => {
   });
 
   it('returns empty context when RAG is enabled but no vector store is configured', async () => {
-    const service = new RagService(makeConfig({ RAG_ENABLED: true }));
+    const service = new RagService(
+      makeConfig({ RAG_ENABLED: true }),
+      embeddings,
+      new NoopVectorStore(),
+    );
 
     const result = await service.buildResumeContext({
       role: 'Backend Engineer',
@@ -40,7 +54,11 @@ describe('RagService', () => {
   });
 
   it('returns empty job-match context with the same shape', async () => {
-    const service = new RagService(makeConfig());
+    const service = new RagService(
+      makeConfig(),
+      embeddings,
+      new NoopVectorStore(),
+    );
 
     await expect(
       service.buildJobMatchContext({

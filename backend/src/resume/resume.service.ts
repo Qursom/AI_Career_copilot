@@ -1,6 +1,11 @@
 import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Inject,
   Injectable,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { LlmService } from '../llm/llm.service';
@@ -14,59 +19,41 @@ import { ResumeAnalysisSchema, type ResumeAnalysis } from './resume.schema';
 import { mergeMockWithRagFields } from '../rag/merge-mock-rag';
 import { RagService } from '../rag/rag.service';
 import { userMessageForUpstreamError } from '../llm/llm-upstream.user-message';
+import { UsersService } from '../users/users.service';
+import { InsufficientCoinsError } from '../users/users.store';
+import { CacheService } from '../cache/cache.service';
+import { PdfExtractService } from './pdf-extract.service';
+import { RESUME_STORE, type ResumeStore } from './resume.store';
 
-const SYSTEM_PROMPT = `You are a senior career coach and ATS specialist.
+const SYSTEM_PROMPT = `You are an Expert ATS Resume Analyzer.
 
-You MUST tailor every field to the TARGET ROLE the user provides. Do not give
-generic frontend advice to a backend role, and vice versa. If the role is
-"Backend Engineer (Node.js)", your strengths, improvements, missing skills,
-optimized bullets, and ATS notes must all be Node.js / backend specific
-(Node.js, TypeScript, NestJS/Express, PostgreSQL, Redis, Kafka/SQS, Docker,
-Kubernetes, AWS, OpenTelemetry, CI/CD, OWASP / OAuth2). Apply the same
-discipline for frontend, fullstack, mobile, data, ML, DevOps/SRE, and QA roles.
+Evaluate the resume against Applicant Tracking System (ATS) standards and the
+TARGET ROLE when provided. Tailor strengths, weaknesses, missing skills,
+recommendations, and ATS notes to that role.
 
-Analyze the resume and return STRICT JSON with the following keys:
+Return STRICT JSON with these keys:
 
-- "roast": string
-  Direct, specific critique tied to the target role. No generic phrases.
-  Be honest but professional.
-
-- "strengths": string[]
-  3–5 concrete strengths actually visible in the resume that are relevant to
-  the target role. Quote or name the specific technology / outcome.
-
-- "improvements": string[]
-  Concrete, actionable improvements for the target role. Focus on missing
-  metrics, weak wording, structure issues, and role-specific signals the
-  resume is lacking (e.g. p95 latency for backend, Core Web Vitals for
-  frontend, MTTR for SRE, AUC/lift for ML).
-
-- "missingSkills": string[]
-  Up to 8 skills that are commonly expected for the target role but are
-  absent from the resume. Order by importance for the role. Do NOT include
-  skills the resume already mentions.
-
+- "fullName": string
+- "email": string
+- "phone": string
+- "summary": string (professional summary)
+- "skills": string[] (technical skills)
+- "projects": string[]
+- "experience": string[] (work experience highlights)
+- "education": string[]
+- "roast": string (direct, professional critique)
+- "strengths": string[] (3–5 concrete strengths)
+- "weaknesses": string[]
+- "improvements": string[] (actionable ATS-oriented improvements)
+- "recommendations": string[] (list of suggestions for the frontend)
+- "missingSkills": string[] (up to 8 skills expected for the suggested/target role)
+- "suggestedJobRole": string
 - "marketSignals": string[]
-  2-6 concise, evidence-grounded expectations from retrieved labor-market
-  context. These should support your recommendations.
-
 - "priorityGaps": string[]
-  0-6 high-priority gaps based on retrieved context and the resume content.
-
 - "citations": string[]
-  0-4 source citations from the retrieved context (source name and URL text).
-
-- "optimized": string
-  Rewrite 4–6 high-impact bullets for the target role with strong action
-  verbs, quantified impact, and keywords the target-role ATS will parse.
-  Use "\\n" for newlines.
-
-- "atsScore": number
-  Integer 0–100. Score against the target role, not the resume in isolation.
-
+- "optimized": string (4–6 rewritten bullets, use \\n)
+- "atsScore": number (integer 0–100)
 - "atsNotes": string
-  Explain the score in terms of the target role: which keywords were present,
-  which were missing, and specific formatting / structure advice for ATS.
 
 Rules:
 - Return ONLY valid JSON
@@ -80,12 +67,83 @@ export class ResumeService {
   constructor(
     private readonly llm: LlmService,
     private readonly rag: RagService,
+    private readonly users: UsersService,
+    private readonly cache: CacheService,
+    private readonly pdf: PdfExtractService,
+    @Inject(RESUME_STORE) private readonly resumes: ResumeStore,
   ) {}
+
+  async analyzeForUser(args: {
+    userId: string;
+    email?: string;
+    dto: AnalyzeResumeDto;
+    file?: Express.Multer.File;
+  }): Promise<ResumeAnalysis & { interviewCoins: number }> {
+    await this.users.ensureUser(args.userId, args.email);
+
+    let resumeText = args.dto.resume?.trim() ?? '';
+    try {
+      if (args.file) {
+        resumeText = await this.pdf.extractText(args.file);
+      }
+      if (resumeText.length < 50) {
+        throw new BadRequestException({
+          message: 'resume must be between 50 and 20,000 characters.',
+          error: 'VALIDATION_ERROR',
+        });
+      }
+
+      let charged;
+      try {
+        charged = await this.users.chargeResumeAnalysis(args.userId);
+      } catch (err) {
+        if (err instanceof InsufficientCoinsError) {
+          throw new HttpException(
+            {
+              message: err.message,
+              error: 'INSUFFICIENT_COINS',
+            },
+            HttpStatus.PAYMENT_REQUIRED,
+          );
+        }
+        throw err;
+      }
+
+      const analysis = await this.analyze({
+        resume: resumeText,
+        role: args.dto.role,
+      });
+      await this.resumes.upsert(args.userId, analysis);
+      await this.cache.set(this.cacheKey(args.userId), JSON.stringify(analysis));
+      return { ...analysis, interviewCoins: charged.interviewCoins };
+    } finally {
+      if (args.file?.path) {
+        await this.pdf.unlink(args.file.path);
+      }
+    }
+  }
+
+  async getMine(userId: string): Promise<ResumeAnalysis> {
+    const cached = await this.cache.get(this.cacheKey(userId));
+    if (cached) {
+      const parsed = ResumeAnalysisSchema.safeParse(JSON.parse(cached));
+      if (parsed.success) return parsed.data;
+    }
+    const stored = await this.resumes.findByUserId(userId);
+    if (!stored) {
+      throw new NotFoundException({
+        message: 'No resume analysis found for this user.',
+        error: 'NOT_FOUND',
+      });
+    }
+    await this.cache.set(this.cacheKey(userId), JSON.stringify(stored));
+    return stored;
+  }
 
   async analyze(dto: AnalyzeResumeDto): Promise<ResumeAnalysis> {
     const ragContext = await this.rag.buildResumeContext({
       role: dto.role,
-      resume: dto.resume,
+      resume: dto.resume ?? '',
     });
     const userPrompt = this.buildUserPrompt(dto, ragContext.promptContext);
 
@@ -119,16 +177,20 @@ export class ResumeService {
     }
   }
 
+  private cacheKey(userId: string): string {
+    return `resume:analysis:${userId}`;
+  }
+
   private buildUserPrompt(dto: AnalyzeResumeDto, ragContext: string): string {
     const lines = [`RESUME:\n${dto.resume}`];
     if (dto.role) {
       lines.push(
         `\nTARGET ROLE: ${dto.role}`,
-        `Tailor EVERY field (roast, strengths, improvements, missingSkills, optimized, atsScore, atsNotes) to this exact role. Do not output generic advice. If the role is backend-oriented, do not suggest frontend skills like accessibility or Core Web Vitals, and vice-versa.`,
+        `Tailor EVERY field to this exact role.`,
       );
     } else {
       lines.push(
-        `\nNo target role provided. Infer the most likely role from the resume content and state your inference briefly in "atsNotes" before tailoring the rest of the response.`,
+        `\nNo target role provided. Infer the most likely role and put it in "suggestedJobRole".`,
       );
     }
     if (ragContext) {

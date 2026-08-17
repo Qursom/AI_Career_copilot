@@ -1,8 +1,22 @@
 import { RagIngestionService } from './rag-ingestion.service';
+import type { TypedConfigService } from '../../config/typed-config.service';
+import type { EmbeddingService } from '../embeddings/embedding.service';
+import { NoopVectorStore } from '../vector/noop-vector.store';
 
 describe('RagIngestionService', () => {
+  const embeddings = {
+    embedText: jest.fn().mockResolvedValue([0.1, 0.2]),
+  } as unknown as EmbeddingService;
+  const config = {
+    get: () => 768,
+  } as unknown as TypedConfigService;
+
   it('normalizes records and removes invalid entries', () => {
-    const service = new RagIngestionService();
+    const service = new RagIngestionService(
+      embeddings,
+      new NoopVectorStore(),
+      config,
+    );
 
     const out = service.normalizeRecords([
       {
@@ -36,7 +50,11 @@ describe('RagIngestionService', () => {
   });
 
   it('skips upsert when no vector store is configured', async () => {
-    const service = new RagIngestionService();
+    const service = new RagIngestionService(
+      embeddings,
+      new NoopVectorStore(),
+      config,
+    );
     const result = await service.ingestPublicDatasets();
 
     expect(result.processed).toBe(0);

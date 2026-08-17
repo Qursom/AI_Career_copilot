@@ -1,5 +1,6 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { CacheService } from '../cache/cache.service';
 import {
   LlmInvalidOutputError,
   LlmTimeoutError,
@@ -9,7 +10,24 @@ import { LlmService } from '../llm/llm.service';
 import { LLM_PROVIDER } from '../llm/llm.tokens';
 import { MockLlmProvider } from '../llm/providers/mock.provider';
 import { RagService } from '../rag/rag.service';
+import { UsersService } from '../users/users.service';
+import { PdfExtractService } from './pdf-extract.service';
 import { ResumeService } from './resume.service';
+import { RESUME_STORE } from './resume.store';
+
+const extraFields = {
+  fullName: 'Jane Doe',
+  email: 'jane@example.com',
+  phone: '',
+  summary: 'Senior frontend engineer with shipped product work.',
+  skills: ['TypeScript', 'React'],
+  projects: ['Design system'],
+  experience: ['5+ years frontend'],
+  education: ['BSc CS'],
+  weaknesses: ['Limited GraphQL'],
+  recommendations: ['Quantify mentoring impact'],
+  suggestedJobRole: 'Senior Frontend Engineer',
+};
 
 describe('ResumeService', () => {
   const buildService = async (
@@ -40,6 +58,36 @@ describe('ResumeService', () => {
             }),
           },
         },
+        {
+          provide: UsersService,
+          useValue: {
+            ensureUser: jest.fn().mockResolvedValue({ interviewCoins: 100 }),
+            chargeResumeAnalysis: jest
+              .fn()
+              .mockResolvedValue({ interviewCoins: 90 }),
+          },
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: PdfExtractService,
+          useValue: {
+            extractText: jest.fn(),
+            unlink: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: RESUME_STORE,
+          useValue: {
+            upsert: jest.fn(async (_id: string, a: unknown) => a),
+            findByUserId: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     })
       .overrideProvider(LlmService)
@@ -57,6 +105,7 @@ describe('ResumeService', () => {
 
   it('returns a validated analysis on success', async () => {
     const fake = {
+      ...extraFields,
       roast: 'x'.repeat(30),
       strengths: ['Strong TypeScript background', 'Shipped design systems'],
       improvements: ['Quantify mentoring impact', 'Replace weak verbs'],
@@ -94,6 +143,7 @@ describe('ResumeService', () => {
 
   it('when provider is gemini, prefers LLM marketSignals, priorityGaps, citations', async () => {
     const fake = {
+      ...extraFields,
       roast: 'x'.repeat(30),
       strengths: ['a'],
       improvements: ['b'],
@@ -112,6 +162,7 @@ describe('ResumeService', () => {
 
   it('when mock and RAG empty, keeps LLM RAG fields', async () => {
     const fake = {
+      ...extraFields,
       roast: 'x'.repeat(30),
       strengths: ['a'],
       improvements: ['b'],
@@ -139,6 +190,10 @@ describe('ResumeService', () => {
             }),
           },
         },
+        { provide: UsersService, useValue: {} },
+        { provide: CacheService, useValue: {} },
+        { provide: PdfExtractService, useValue: {} },
+        { provide: RESUME_STORE, useValue: {} },
       ],
     })
       .overrideProvider(LlmService)

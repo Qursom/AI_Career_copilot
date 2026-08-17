@@ -823,11 +823,23 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
   const matchSuggestions = improvements.slice(0, 6);
 
   return {
-    // Resume schema
+    fullName: guessName(ctx.resume),
+    email: guessEmail(ctx.resume),
+    phone: '',
+    summary: `Candidate aligned to ${profile.label} with a ${words}-word resume.`,
+    skills: present.slice(0, 12).map((s) => s.label),
+    projects: ['See resume projects — mock extraction'],
+    experience: ['See resume experience — mock extraction'],
+    education: ['See resume education — mock extraction'],
     roast,
     strengths: dedupe(strengths).slice(0, 5),
+    weaknesses: missingSkillLabels.slice(0, 4).map(
+      (label) => `Limited evidence of ${label} on the resume.`,
+    ),
     improvements: dedupe(improvements).slice(0, 6),
+    recommendations: dedupe(improvements).slice(0, 6),
     missingSkills: dedupe(missingSkillLabels).slice(0, 7),
+    suggestedJobRole: ctx.role || profile.label,
     marketSignals: marketSignals.slice(0, 5),
     priorityGaps: priorityGaps.slice(0, 5),
     citations,
@@ -840,6 +852,17 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
     gaps: dedupe(gaps).slice(0, 8),
     suggestions: dedupe(matchSuggestions).slice(0, 8),
   };
+}
+
+function guessName(resume: string): string {
+  const line = resume.split('\n').map((s) => s.trim()).find(Boolean) ?? '';
+  const cut = line.split(/[—\-|,]/)[0]?.trim() ?? '';
+  return cut.slice(0, 80) || 'Unknown candidate';
+}
+
+function guessEmail(resume: string): string {
+  const m = resume.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return m?.[0] ?? '';
 }
 
 function dedupe(xs: string[]): string[] {

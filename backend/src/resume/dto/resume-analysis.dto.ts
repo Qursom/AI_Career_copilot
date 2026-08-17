@@ -1,6 +1,30 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ResumeAnalysisDto {
+  @ApiProperty({ required: false })
+  fullName!: string;
+
+  @ApiProperty({ required: false })
+  email!: string;
+
+  @ApiProperty({ required: false })
+  phone!: string;
+
+  @ApiProperty({ required: false })
+  summary!: string;
+
+  @ApiProperty({ type: [String], required: false })
+  skills!: string[];
+
+  @ApiProperty({ type: [String], required: false })
+  projects!: string[];
+
+  @ApiProperty({ type: [String], required: false })
+  experience!: string[];
+
+  @ApiProperty({ type: [String], required: false })
+  education!: string[];
+
   @ApiProperty({
     description: 'Honest, direct roast of the weakest parts of the resume.',
   })
@@ -16,6 +40,9 @@ export class ResumeAnalysisDto {
   })
   strengths!: string[];
 
+  @ApiProperty({ type: [String], required: false })
+  weaknesses!: string[];
+
   @ApiProperty({
     description:
       'Concrete, actionable improvements. Missing metrics, weak wording, structure.',
@@ -27,12 +54,18 @@ export class ResumeAnalysisDto {
   })
   improvements!: string[];
 
+  @ApiProperty({ type: [String], required: false })
+  recommendations!: string[];
+
   @ApiProperty({
     description: 'Important skills missing for the target role.',
     type: [String],
     example: ['GraphQL', 'Accessibility (WCAG 2.2)', 'Design systems at scale'],
   })
   missingSkills!: string[];
+
+  @ApiProperty({ required: false })
+  suggestedJobRole!: string;
 
   @ApiProperty({
     description:
@@ -70,4 +103,7 @@ export class ResumeAnalysisDto {
 
   @ApiProperty({ description: 'Notes explaining the ATS score and fixes.' })
   atsNotes!: string;
+
+  @ApiProperty({ required: false, description: 'Remaining interview coins after this run.' })
+  interviewCoins?: number;
 }

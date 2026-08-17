@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import UploadBox from "@/components/UploadBox";
 import ResultCard from "@/components/ResultCard";
 import BulletCard from "@/components/BulletCard";
 import ErrorBanner from "@/components/ErrorBanner";
 import RoleInput from "@/components/RoleInput";
-import { api, ApiError, type ResumeAnalysis } from "@/lib/api";
+import { api, ApiError, type ResumeAnalysis, type UserProfile } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 type AnalysisState =
   | { status: "idle" }
@@ -15,17 +17,66 @@ type AnalysisState =
   | ({ status: "done" } & ResumeAnalysis);
 
 export default function ResumePage() {
+  const { session, loading: authLoading } = useAuth();
   const [state, setState] = useState<AnalysisState>({ status: "idle" });
   const [role, setRole] = useState("");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  const handleAnalyze = async (text: string) => {
+  const authHeaders = async () => {
+    if (!session) return undefined;
+    const token = await session.getIdToken();
+    return {
+      token: token || undefined,
+      userId: session.uid,
+    };
+  };
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    void (async () => {
+      const auth = await authHeaders();
+      try {
+        const me = await api.getMe(auth);
+        if (!cancelled) setProfile(me);
+      } catch {
+        /* first visit */
+      }
+      try {
+        const cached = await api.getMyResume(auth);
+        if (!cancelled) setState({ status: "done", ...cached });
+      } catch {
+        /* no cached resume */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.uid]);
+
+  const handleAnalyze = async (payload: { text?: string; file?: File }) => {
+    if (!session) return;
     setState({ status: "loading" });
     try {
-      const data = await api.analyzeResume({
-        resume: text,
-        role: role.trim() || undefined,
-      });
+      const auth = await authHeaders();
+      const data = payload.file
+        ? await api.analyzeResumePdf(payload.file, role.trim() || undefined, auth)
+        : await api.analyzeResume({
+            resume: payload.text ?? "",
+            role: role.trim() || undefined,
+          }, auth);
       setState({ status: "done", ...data });
+      if (typeof data.interviewCoins === "number") {
+        setProfile((p) =>
+          p
+            ? { ...p, interviewCoins: data.interviewCoins ?? p.interviewCoins }
+            : p,
+        );
+      } else {
+        const me = await api.getMe(auth);
+        setProfile(me);
+      }
       requestAnimationFrame(() => {
         document
           .getElementById("results")
@@ -41,18 +92,42 @@ export default function ResumePage() {
 
   const isLoading = state.status === "loading";
 
+  if (authLoading) {
+    return <p className="px-6 pt-10 text-white/50">Loading session…</p>;
+  }
+
+  if (!session) {
+    return (
+      <section className="max-w-xl mx-auto px-6 pt-16 text-center">
+        <h1 className="text-3xl font-semibold">Sign in to analyze resumes</h1>
+        <p className="mt-3 text-white/60">
+          The Resume Agent needs your user id to cache scores and deduct 10
+          interview coins per run.
+        </p>
+        <Link href="/login" className="btn-primary mt-8 inline-flex">
+          Go to sign in
+        </Link>
+      </section>
+    );
+  }
+
   return (
     <section className="max-w-5xl mx-auto px-6 pt-10 pb-20">
       <div className="animate-fade-in-up">
-        <span className="chip glass text-white/70">Resume Tools</span>
+        <span className="chip glass text-white/70">Resume Agent</span>
         <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight">
-          Roast, rewrite, <span className="text-gradient">and rank it</span>.
+          ATS score, extract, <span className="text-gradient">and coach</span>.
         </h1>
         <p className="mt-4 text-white/60 max-w-2xl">
-          Paste or upload your resume. In seconds you&apos;ll get an unfiltered
-          roast, a rewritten version, strengths, gaps, missing skills, and an
-          ATS score grounded with real-world role expectations.
+          Upload a PDF. We parse it on the server, score it against ATS
+          standards, and cache the result for instant dashboard loads.
         </p>
+        {profile && (
+          <p className="mt-3 text-sm text-indigo-200/80">
+            Interview coins: <strong>{profile.interviewCoins}</strong> (each
+            score costs {profile.resumeCoinCost})
+          </p>
+        )}
       </div>
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_1.15fr]">
@@ -110,6 +185,22 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
         }
       />
 
+      {(data.fullName || data.suggestedJobRole) && (
+        <ResultCard
+          title="Extracted profile"
+          content={[
+            data.fullName && `Name: ${data.fullName}`,
+            data.email && `Email: ${data.email}`,
+            data.phone && `Phone: ${data.phone}`,
+            data.suggestedJobRole && `Suggested role: ${data.suggestedJobRole}`,
+            data.summary,
+          ]
+            .filter(Boolean)
+            .join("\n")}
+          tone="default"
+        />
+      )}
+
       <ResultCard
         title="AI Roast"
         content={data.roast}
@@ -138,12 +229,30 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
       />
 
       <BulletCard
+        title="Weaknesses"
+        tone="danger"
+        items={data.weaknesses ?? []}
+        emptyHint="No major weaknesses called out."
+        icon={
+          <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+        }
+      />
+
+      <BulletCard
         title="Improvements"
         tone="warning"
         items={data.improvements}
         icon={
           <path d="M12 20h9 M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
         }
+      />
+
+      <BulletCard
+        title="Recommendations"
+        tone="info"
+        items={data.recommendations ?? []}
+        emptyHint="No extra recommendations."
+        icon={<path d="M12 6v12 M6 12h12" />}
       />
 
       <BulletCard
@@ -155,6 +264,15 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
         icon={
           <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
         }
+      />
+
+      <BulletCard
+        title="Skills"
+        tone="info"
+        items={data.skills ?? []}
+        variant="pills"
+        emptyHint="No skills extracted."
+        icon={<path d="M12 6v12 M6 12h12" />}
       />
 
       <BulletCard
@@ -208,24 +326,10 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
 function EmptyState() {
   return (
     <div className="card flex flex-col items-center justify-center text-center py-14">
-      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="w-5 h-5 text-indigo-300"
-          aria-hidden="true"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8" />
-        </svg>
-      </div>
       <h3 className="mt-4 font-semibold">Your results will appear here</h3>
       <p className="mt-1 text-sm text-white/50 max-w-sm">
-        Pick a target role (optional), paste or upload your resume, and hit{" "}
-        <span className="text-white/80">Analyze resume</span>.
+        Upload a PDF or paste text, then analyze. Cached scores load instantly
+        on return visits.
       </p>
     </div>
   );
@@ -237,17 +341,10 @@ function LoadingState() {
     <div className="space-y-4">
       {rows.map((i) => (
         <div key={i} className="card">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-white/5 animate-pulse" />
-              <div className="h-4 w-32 rounded bg-white/5 animate-pulse" />
-            </div>
-            <div className="h-5 w-16 rounded-full bg-white/5 animate-pulse" />
-          </div>
+          <div className="h-4 w-32 rounded bg-white/5 animate-pulse" />
           <div className="mt-5 space-y-2">
             <div className="h-3 w-full rounded bg-white/5 animate-pulse" />
             <div className="h-3 w-11/12 rounded bg-white/5 animate-pulse" />
-            <div className="h-3 w-4/5 rounded bg-white/5 animate-pulse" />
           </div>
         </div>
       ))}

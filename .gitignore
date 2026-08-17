@@ -25,3 +25,9 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# Temporary resume uploads
+backend/uploads/
+
+# Firebase service-account keys (never commit)
+*firebase-adminsdk*.json

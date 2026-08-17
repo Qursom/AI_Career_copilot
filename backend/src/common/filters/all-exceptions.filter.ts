@@ -133,7 +133,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private codeFromStatus(status: number): string {
     const map: Record<number, string> = {
       400: 'BAD_REQUEST',
-      401: 'UNAUTHORIZED',
+      402: 'INSUFFICIENT_COINS',
       403: 'FORBIDDEN',
       404: 'NOT_FOUND',
       409: 'CONFLICT',

@@ -12,11 +12,15 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { AuthModule } from './auth/auth.module';
+import { CacheModule } from './cache/cache.module';
+import { DatabaseModule } from './database/database.module';
 import { LlmModule } from './llm/llm.module';
 import { ResumeModule } from './resume/resume.module';
 import { JobMatchModule } from './job-match/job-match.module';
 import { HealthModule } from './health/health.module';
 import { RagModule } from './rag/rag.module';
+import { UsersModule } from './users/users.module';
 
 const globals: Provider[] = [
   { provide: APP_FILTER, useClass: AllExceptionsFilter },
@@ -28,6 +32,7 @@ const globals: Provider[] = [
 @Module({
   imports: [
     TypedConfigModule,
+    DatabaseModule,
     ThrottlerModule.forRootAsync({
       inject: [TypedConfigService],
       useFactory: (config: TypedConfigService) => ({
@@ -39,6 +44,9 @@ const globals: Provider[] = [
         ],
       }),
     }),
+    AuthModule,
+    CacheModule,
+    UsersModule,
     LlmModule,
     ResumeModule,
     JobMatchModule,

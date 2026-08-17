@@ -1,1 +1,2 @@
 export const RAG_EMBEDDING_PROVIDER = Symbol('RAG_EMBEDDING_PROVIDER');
+export const RAG_VECTOR_STORE = Symbol('RAG_VECTOR_STORE');
