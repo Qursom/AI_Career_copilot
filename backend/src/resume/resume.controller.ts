@@ -6,12 +6,14 @@ import {
   HttpStatus,
   Post,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiAcceptedResponse,
   ApiBearerAuth,
   ApiBody,
   ApiConsumes,
@@ -22,14 +24,22 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
+import { isResumeJobAccepted } from '../queue/resume-job.types';
+import { ResumeJobAcceptedDto } from '../queue/dto/resume-job-status.dto';
 import { AnalyzeResumeDto } from './dto/analyze-resume.dto';
 import { ExtractedResumeTextDto } from './dto/extracted-resume-text.dto';
 import { ResumeAnalysisDto } from './dto/resume-analysis.dto';
 import { ResumeUploadDto } from './dto/resume-upload.dto';
 import { ResumeService } from './resume.service';
+
+function applyAnalyzeStatus(res: Response, body: unknown): void {
+  if (isResumeJobAccepted(body)) {
+    res.status(HttpStatus.ACCEPTED);
+  }
+}
 
 function resolveRequestId(req: Request): string {
   const idem =
@@ -96,24 +106,28 @@ export class ResumeController {
   @ApiOperation({
     summary: 'Upload a PDF resume for LangGraph analysis',
     description:
-      'Multipart field "resume" (PDF, max RESUME_MAX_FILE_SIZE_MB — 20 MB by default). Costs 10 interview coins after success.',
+      'Multipart field "resume" (PDF, max RESUME_MAX_FILE_SIZE_MB — 20 MB by default). Inline analysis returns 200. When RESUME_QUEUE_ENABLED=true this returns 202 + jobId; poll GET /resume/status/:jobId. Costs 10 interview coins after success.',
   })
   @ApiResponse({ status: 200, type: ResumeAnalysisDto })
+  @ApiAcceptedResponse({ type: ResumeJobAcceptedDto })
   @ApiUnprocessableEntityResponse({ description: 'Input failed validation.' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded.' })
-  upload(
+  async upload(
     @CurrentUser() user: AuthUser,
     @Body() dto: ResumeUploadDto,
     @UploadedFile() file: Express.Multer.File,
     @Req() req: Request,
-  ): Promise<ResumeAnalysisDto> {
-    return this.service.analyzeUpload({
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ResumeAnalysisDto | ResumeJobAcceptedDto> {
+    const body = await this.service.analyzeUpload({
       userId: user.userId,
       email: user.email,
       file,
       role: dto.role,
       requestId: resolveRequestId(req),
     });
+    applyAnalyzeStatus(res, body);
+    return body;
   }
 
   @Post('analyze')
@@ -124,23 +138,27 @@ export class ResumeController {
   @ApiOperation({
     summary: 'Analyze a resume',
     description:
-      'JSON body with resume text, or multipart PDF field "file". Uses the same LangGraph pipeline as /upload. Costs 10 interview coins after success.',
+      'JSON body with resume text, or multipart PDF field "file". Same pipeline as /upload. Inline analysis returns 200. When RESUME_QUEUE_ENABLED=true this returns 202 + jobId; poll GET /resume/status/:jobId. Costs 10 interview coins after success.',
   })
   @ApiResponse({ status: 200, type: ResumeAnalysisDto })
+  @ApiAcceptedResponse({ type: ResumeJobAcceptedDto })
   @ApiUnprocessableEntityResponse({ description: 'Input failed validation.' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded.' })
-  analyze(
+  async analyze(
     @CurrentUser() user: AuthUser,
     @Body() dto: AnalyzeResumeDto,
     @UploadedFile() file: Express.Multer.File | undefined,
     @Req() req: Request,
-  ): Promise<ResumeAnalysisDto> {
-    return this.service.analyzeForUser({
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ResumeAnalysisDto | ResumeJobAcceptedDto> {
+    const body = await this.service.analyzeForUser({
       userId: user.userId,
       email: user.email,
       dto,
       file,
       requestId: resolveRequestId(req),
     });
+    applyAnalyzeStatus(res, body);
+    return body;
   }
 }

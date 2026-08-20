@@ -24,7 +24,7 @@ export class ResumeService {
     dto: AnalyzeResumeDto;
     file?: Express.Multer.File;
     requestId?: string;
-  }): Promise<ResumeAnalysis & { interviewCoins: number }> {
+  }) {
     return this.analysis.analyzeForUser({
       userId: args.userId,
       email: args.email,
@@ -41,7 +41,7 @@ export class ResumeService {
     file: Express.Multer.File;
     role?: string;
     requestId?: string;
-  }): Promise<ResumeAnalysis & { interviewCoins: number }> {
+  }) {
     return this.analysis.analyzeUpload(args);
   }
 

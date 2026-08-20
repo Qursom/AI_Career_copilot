@@ -12,6 +12,13 @@ describe('validateEnv', () => {
     expect(() => validateEnv(base)).not.toThrow();
   });
 
+  it('leaves the resume queue off unless RESUME_QUEUE_ENABLED=true', () => {
+    expect(validateEnv(base).RESUME_QUEUE_ENABLED).toBe(false);
+    expect(
+      validateEnv({ ...base, RESUME_QUEUE_ENABLED: 'true' }).RESUME_QUEUE_ENABLED,
+    ).toBe(true);
+  });
+
   it('rejects the unimplemented openai LLM provider', () => {
     expect(() =>
       validateEnv({ ...base, LLM_PROVIDER: 'openai' }),

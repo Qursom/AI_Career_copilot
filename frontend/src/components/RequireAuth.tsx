@@ -38,9 +38,21 @@ export default function RequireAuth({
   if (!isAuthenticated) {
     return (
       <section className="max-w-md mx-auto px-6 pt-16 pb-20">
-        <div className="card p-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-3 text-sm text-white/60">{description}</p>
+        <div className="card p-8 sm:p-10 text-center">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-blue-500 ring-1 ring-white/20">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-5 w-5 text-white"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              aria-hidden="true"
+            >
+              <path d="M12 2 14.5 9 22 11.5 14.5 14 12 22 9.5 14 2 11.5 9.5 9Z" />
+            </svg>
+          </span>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">{title}</h1>
+          <p className="mt-3 text-sm text-white/60 leading-relaxed">{description}</p>
 
           {sessionExpired && (
             <p

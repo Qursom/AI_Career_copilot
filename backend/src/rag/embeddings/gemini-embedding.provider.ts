@@ -19,7 +19,8 @@ interface EmbedContentResponse {
  * `@langchain/google-genai`'s `GoogleGenerativeAIEmbeddings` does not pass
  * `outputDimensionality`, which this corpus depends on (Matryoshka 768/1536
  * vs the model's native 3072). The REST field is forwarded here so ingest
- * and query stay in the same vector space.
+ * and query stay in the same vector space. Retries go through LangChain's
+ * `Embeddings.caller`.
  */
 export class GeminiEmbeddingProvider
   extends Embeddings
@@ -31,7 +32,7 @@ export class GeminiEmbeddingProvider
   private readonly endpoint: string;
 
   constructor(private readonly opts: GeminiEmbeddingProviderOptions) {
-    super({});
+    super({ maxRetries: 2 });
     this.dimensions = opts.outputDimensionality;
     this.endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
       opts.model,
@@ -45,7 +46,23 @@ export class GeminiEmbeddingProvider
   async embedQuery(text: string): Promise<number[]> {
     const cleaned = text.trim();
     if (!cleaned) return [];
+    const values = await this.caller.call(
+      this.requestEmbedding.bind(this),
+      cleaned,
+    );
+    if (values.length !== this.dimensions) {
+      throw new Error(
+        `Gemini embedding width ${values.length} does not match GEMINI_EMBEDDING_DIMENSIONS=${this.dimensions}.`,
+      );
+    }
+    return values;
+  }
 
+  embedDocuments(documents: string[]): Promise<number[][]> {
+    return Promise.all(documents.map((doc) => this.embedQuery(doc)));
+  }
+
+  private async requestEmbedding(cleaned: string): Promise<number[]> {
     this.logger.debug(
       `Embedding ${cleaned.length} chars with ${this.opts.model} ` +
         `(dim=${this.opts.outputDimensionality})`,
@@ -76,15 +93,6 @@ export class GeminiEmbeddingProvider
     if (!values?.length) {
       throw new Error('Gemini embedding response contained no vector values.');
     }
-    if (values.length !== this.dimensions) {
-      throw new Error(
-        `Gemini embedding width ${values.length} does not match GEMINI_EMBEDDING_DIMENSIONS=${this.dimensions}.`,
-      );
-    }
     return values;
-  }
-
-  embedDocuments(documents: string[]): Promise<number[][]> {
-    return Promise.all(documents.map((doc) => this.embedQuery(doc)));
   }
 }

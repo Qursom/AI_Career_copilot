@@ -5,7 +5,9 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
   ServiceUnavailableException,
+  forwardRef,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
@@ -29,6 +31,8 @@ import { UsersService } from '../users/users.service';
 import { PdfExtractService } from './pdf-extract.service';
 import { ResumeFileService } from './resume-file.service';
 import { ResumeAnalysisSchema, type ResumeAnalysis } from './resume.schema';
+import { ResumeJobClient } from '../queue/resume-job.client';
+import type { ResumeJobAccepted } from '../queue/resume-job.types';
 import { RESUME_STORE, type ResumeStore } from './resume.store';
 
 const IDEMPOTENCY_TTL_SECONDS = 60 * 60;
@@ -49,6 +53,9 @@ export class ResumeAnalysisService {
     private readonly files: ResumeFileService,
     private readonly config: TypedConfigService,
     @Inject(RESUME_STORE) private readonly resumes: ResumeStore,
+    @Optional()
+    @Inject(forwardRef(() => ResumeJobClient))
+    private readonly jobs?: ResumeJobClient,
   ) {
     this.graph = createResumeAnalysisGraph({
       pdf: this.pdf,
@@ -81,7 +88,8 @@ export class ResumeAnalysisService {
   }
 
   /**
-   * PDF upload workflow: validate → LangGraph → persist → cache → charge.
+   * PDF upload workflow: validate, then enqueue (when Redis is configured)
+   * or run LangGraph inline.
    */
   async analyzeUpload(args: {
     userId: string;
@@ -89,9 +97,9 @@ export class ResumeAnalysisService {
     file: Express.Multer.File;
     role?: string;
     requestId?: string;
-  }): Promise<ResumeAnalysisResult> {
+  }): Promise<ResumeAnalysisResult | ResumeJobAccepted> {
     await this.files.assertValidPdf(args.file);
-    return this.runAnalysis({
+    return this.submit({
       userId: args.userId,
       email: args.email,
       filePath: args.file.path,
@@ -110,8 +118,8 @@ export class ResumeAnalysisService {
     role?: string;
     file?: Express.Multer.File;
     requestId?: string;
-  }): Promise<ResumeAnalysisResult> {
-    return this.runAnalysis({
+  }): Promise<ResumeAnalysisResult | ResumeJobAccepted> {
+    return this.submit({
       userId: args.userId,
       email: args.email,
       filePath: args.file?.path,
@@ -121,7 +129,70 @@ export class ResumeAnalysisService {
     });
   }
 
-  private async runAnalysis(args: {
+  /**
+   * HTTP entry: coin/idempotency checks, then enqueue or execute.
+   * The worker calls {@link execute} directly so a queued job does not
+   * re-enter this method.
+   */
+  async submit(args: {
+    userId: string;
+    email?: string;
+    filePath?: string;
+    rawText?: string;
+    role?: string;
+    requestId?: string;
+  }): Promise<ResumeAnalysisResult | ResumeJobAccepted> {
+    const requestId = args.requestId?.trim() || randomUUID();
+    const payload = { ...args, requestId };
+
+    await this.users.ensureUser(args.userId, args.email);
+
+    const idemKey = this.idempotencyKey(args.userId, requestId);
+    const prior = await this.safeCacheGet(idemKey);
+    if (prior) {
+      const parsed = this.parseCachedResult(prior);
+      if (parsed) {
+        this.logger.log(
+          `resume_analysis_idempotent_hit userId=${args.userId} requestId=${requestId}`,
+        );
+        if (args.filePath) await this.pdf.unlink(args.filePath);
+        return parsed;
+      }
+    }
+
+    try {
+      await this.users.assertSufficientCoins(args.userId);
+    } catch (err) {
+      if (args.filePath) await this.pdf.unlink(args.filePath);
+      if (err instanceof InsufficientCoinsError) {
+        throw new HttpException(
+          {
+            message: err.message,
+            error: 'INSUFFICIENT_COINS',
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
+      }
+      throw err;
+    }
+
+    if (this.jobs) {
+      try {
+        return await this.jobs.enqueue(payload);
+      } catch (err) {
+        if (args.filePath) await this.pdf.unlink(args.filePath);
+        throw err;
+      }
+    }
+
+    return this.execute(payload);
+  }
+
+  /**
+   * Runs LangGraph → persist → cache → charge. Called by the HTTP sync path
+   * and by the BullMQ worker. Always deletes a temp PDF in `finally`.
+   */
+  async execute(args: {
     userId: string;
     email?: string;
     filePath?: string;

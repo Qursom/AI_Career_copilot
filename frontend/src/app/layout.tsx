@@ -19,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Career Copilot — Resume & Job Match AI",
+  title: "AI Career Copilot — ATS resume roast, rewrite & job match",
   description:
-    "Roast, optimize, and ATS-score your resume. Match yourself against any job description in seconds with an AI copilot built for your career.",
+    "The AI workspace for job seekers. Roast weak bullets, rewrite for ATS, score your resume, and match any job description in seconds. Free to start.",
 };
 
 export const viewport: Viewport = {

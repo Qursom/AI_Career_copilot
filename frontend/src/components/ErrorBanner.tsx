@@ -31,9 +31,17 @@ function describe(error: ApiError | Error): {
     };
   }
   if (error.isUpstream) {
+    if (error.code === "QUEUE_UNAVAILABLE") {
+      return {
+        title: "Analysis queue is down",
+        body:
+          error.message ||
+          "Redis did not accept the job. Start Redis, or unset REDIS_URL to run analysis immediately.",
+      };
+    }
     return {
       title: "Resume analysis failed",
-      body: "Please try again.",
+      body: error.message || "Please try again.",
     };
   }
   if (error.code === "INSUFFICIENT_COINS" || error.status === 402) {

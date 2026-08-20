@@ -1,6 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { BaseLangChainProvider } from './base-langchain.provider';
+import {
+  BaseLangChainProvider,
+  type StructuredOutputMethod,
+} from './base-langchain.provider';
 
 export interface GeminiProviderOptions {
   apiKey: string;
@@ -9,14 +12,16 @@ export interface GeminiProviderOptions {
 }
 
 /**
- * Gemini via LangChain `ChatGoogleGenerativeAI`. Structured JSON is handled
- * by {@link BaseLangChainProvider} so Groq and Gemini share one parse path.
+ * Gemini via LangChain `ChatGoogleGenerativeAI`. Native jsonSchema structured
+ * output is the default; `json: true` still applies if we fall back to invoke.
  */
 export class GeminiProvider extends BaseLangChainProvider {
   readonly name = 'gemini';
   private readonly logger = new Logger(GeminiProvider.name);
   protected readonly model: ChatGoogleGenerativeAI;
   protected readonly defaultTimeoutMs: number;
+  protected readonly structuredOutputMethod: StructuredOutputMethod =
+    'jsonSchema';
 
   constructor(opts: GeminiProviderOptions) {
     super();

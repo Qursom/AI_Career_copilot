@@ -46,6 +46,35 @@ describe('GeminiProvider (unit, mocked API)', () => {
     );
   });
 
+  it('binds jsonSchema structured output', async () => {
+    const mockWithStructuredOutput = jest.fn().mockReturnValue({
+      invoke: jest.fn().mockResolvedValue({ reply: 'native' }),
+    });
+    (ChatGoogleGenerativeAI as unknown as jest.Mock).mockImplementationOnce(
+      () => ({
+        withStructuredOutput: mockWithStructuredOutput,
+        invoke: mockInvoke,
+      }),
+    );
+
+    const provider = new GeminiProvider({
+      apiKey: 'k',
+      model: 'm',
+      defaultTimeoutMs: 30_000,
+    });
+    await expect(
+      provider.generateStructured({
+        system: 's',
+        prompt: 'p',
+        schema: tinySchema,
+      }),
+    ).resolves.toEqual({ reply: 'native' });
+    expect(mockWithStructuredOutput).toHaveBeenCalledWith(
+      tinySchema,
+      expect.objectContaining({ method: 'jsonSchema' }),
+    );
+  });
+
   it('returns data when Gemini returns valid JSON for the schema', async () => {
     mockInvoke.mockResolvedValue({ content: '{"reply": "ok"}' });
 

@@ -26,10 +26,9 @@ export default function AboutPage() {
           <span className="text-gradient">not for recruiters.</span>
         </h1>
         <p className="mt-6 text-white/60 text-lg leading-relaxed max-w-2xl">
-          Career Copilot is an AI sidekick for job seekers. It roasts the parts
-          of your resume that aren&apos;t landing, rewrites them to hit ATS
-          keywords, and tells you — honestly — how well you match a given job
-          description.
+          Career Copilot is an AI workspace for job seekers. It roasts the
+          parts of your resume that aren&apos;t landing, rewrites them for ATS,
+          and tells you — honestly — how well you match a given job.
         </p>
       </div>
 
@@ -48,7 +47,7 @@ export default function AboutPage() {
         ))}
       </div>
 
-      <div className="mt-16 card text-center py-10">
+      <div className="mt-16 relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-600/20 via-violet-600/10 to-transparent p-10 text-center">
         <p className="text-white/60 max-w-md mx-auto">
           Have feedback, bug reports, or a story about the resume roast that
           landed you an offer?

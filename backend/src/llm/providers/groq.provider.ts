@@ -1,6 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { ChatGroq } from '@langchain/groq';
-import { BaseLangChainProvider } from './base-langchain.provider';
+import {
+  BaseLangChainProvider,
+  type StructuredOutputMethod,
+} from './base-langchain.provider';
 
 export interface GroqProviderOptions {
   apiKey: string;
@@ -9,13 +12,16 @@ export interface GroqProviderOptions {
 }
 
 /**
- * Groq via LangChain `ChatGroq`. Shares structured-output handling with Gemini.
+ * Groq via LangChain `ChatGroq`. `jsonMode` is more portable than strict
+ * json_schema on Groq's current models; BaseLangChainProvider still falls
+ * back to invoke + JSON parse if the bind or API rejects it.
  */
 export class GroqLangChainProvider extends BaseLangChainProvider {
   readonly name = 'groq';
   private readonly logger = new Logger(GroqLangChainProvider.name);
   protected readonly model: ChatGroq;
   protected readonly defaultTimeoutMs: number;
+  protected readonly structuredOutputMethod: StructuredOutputMethod = 'jsonMode';
 
   constructor(opts: GroqProviderOptions) {
     super();

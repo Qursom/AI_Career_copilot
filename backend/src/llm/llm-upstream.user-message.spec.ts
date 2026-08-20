@@ -20,4 +20,11 @@ describe('userMessageForUpstreamError', () => {
     const err = new LlmUpstreamError('Gemini call failed: Something obscure');
     expect(userMessageForUpstreamError(err)).toContain('Something obscure');
   });
+
+  it('maps Groq model 404', () => {
+    const err = new LlmUpstreamError(
+      'Groq call failed: [404 Not Found] model llama-x is not found',
+    );
+    expect(userMessageForUpstreamError(err)).toContain('GROQ_MODEL');
+  });
 });

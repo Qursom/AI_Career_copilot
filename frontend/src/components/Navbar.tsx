@@ -68,14 +68,14 @@ export default function Navbar() {
     pathname === href || (href !== "/" && pathname.startsWith(href));
 
   return (
-    <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-[#05050a]/70 backdrop-blur-xl">
-      <div className="max-w-6xl mx-auto flex items-center justify-between py-4 px-6">
+    <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/8 bg-[#05050a]/75 backdrop-blur-2xl">
+      <div className="max-w-6xl mx-auto flex items-center justify-between py-3.5 px-6">
         <Link
           href={isAuthenticated ? "/dashboard" : "/"}
           className="group flex items-center gap-2.5 font-semibold tracking-tight"
           onClick={() => setOpen(false)}
         >
-          <span className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 via-violet-500 to-blue-500 shadow-[0_8px_24px_-6px_rgba(99,102,241,0.8)]">
+          <span className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 via-violet-500 to-blue-500 shadow-[0_8px_24px_-6px_rgba(99,102,241,0.8)] ring-1 ring-white/20">
             <svg
               viewBox="0 0 24 24"
               fill="none"

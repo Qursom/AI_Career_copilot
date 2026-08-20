@@ -8,8 +8,14 @@ import { diskStorage } from 'multer';
 import { AuthModule } from '../auth/auth.module';
 import { CacheModule } from '../cache/cache.module';
 import { isMongoConfigured } from '../config/mongo-enabled';
+import {
+  isResumeQueueEnabled,
+  isResumeQueueWorkerEnabled,
+} from '../config/redis-enabled';
 import { TypedConfigService } from '../config/typed-config.service';
 import { LlmModule } from '../llm/llm.module';
+import { QueueModule } from '../queue/queue.module';
+import { ResumeAnalysisProcessor } from '../queue/resume-analysis.processor';
 import { RagModule } from '../rag/rag.module';
 import { UsersModule } from '../users/users.module';
 import { MemoryResumeStore } from './memory-resume.store';
@@ -36,6 +42,8 @@ const resumeStoreProvider: Provider = {
 };
 
 const mongoOn = isMongoConfigured();
+const queueOn = isResumeQueueEnabled();
+const queueWorkerOn = queueOn && isResumeQueueWorkerEnabled();
 
 const uploadsDir = join(process.cwd(), 'uploads');
 mkdirSync(uploadsDir, { recursive: true });
@@ -47,6 +55,7 @@ mkdirSync(uploadsDir, { recursive: true });
     AuthModule,
     UsersModule,
     CacheModule,
+    ...(queueOn ? [QueueModule] : []),
     // Upload rules for every resume endpoint. The size limit comes from config
     // here so multer rejects an oversized file at the boundary rather than
     // writing it to disk for ResumeFileService to reject afterwards.
@@ -84,6 +93,7 @@ mkdirSync(uploadsDir, { recursive: true });
     ResumeAnalysisService,
     ResumeFileService,
     PdfExtractService,
+    ...(queueWorkerOn ? [ResumeAnalysisProcessor] : []),
     ...(mongoOn
       ? [
           MongoResumeStore,

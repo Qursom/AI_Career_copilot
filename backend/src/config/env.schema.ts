@@ -68,6 +68,23 @@ export const EnvSchema = z.object({
   MONGODB_URI: z.preprocess(emptyToUndef, z.string().min(1).optional()),
   REDIS_URL: z.preprocess(emptyToUndef, z.string().min(1).optional()),
   REDIS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
+  /**
+   * Opt-in BullMQ for resume analysis. Default false: analyze/upload run
+   * inline and return 200 even when REDIS_URL is set (Redis still serves
+   * cache and sessions). Set true to enqueue and return 202 + jobId.
+   */
+  RESUME_QUEUE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /**
+   * When the resume queue is enabled, this process also runs the worker
+   * unless set to false (jobs stay pending until a worker starts).
+   */
+  RESUME_QUEUE_WORKER: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
   SESSION_TTL_SECONDS: z.coerce
     .number()
     .int()

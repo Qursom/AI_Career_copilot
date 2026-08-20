@@ -14,6 +14,7 @@ import { PdfExtractService } from './pdf-extract.service';
 import { ResumeAnalysisService } from './resume-analysis.service';
 import { ResumeFileService } from './resume-file.service';
 import { RESUME_STORE } from './resume.store';
+import { ResumeJobClient } from '../queue/resume-job.client';
 
 const extraFields = {
   fullName: 'Jane Doe',
@@ -55,6 +56,7 @@ describe('ResumeAnalysisService', () => {
     cacheSet?: jest.Mock;
     upsert?: jest.Mock;
     buildResumeContext?: jest.Mock;
+    enqueue?: jest.Mock;
   }) => {
     const generateStructured =
       opts?.generateStructured ?? jest.fn().mockResolvedValue(validAnalysis());
@@ -66,6 +68,7 @@ describe('ResumeAnalysisService', () => {
     const cacheSet = opts?.cacheSet ?? jest.fn().mockResolvedValue(undefined);
     const upsert =
       opts?.upsert ?? jest.fn(async (_id: string, a: unknown) => a);
+    const enqueue = opts?.enqueue;
     const buildResumeContext =
       opts?.buildResumeContext ??
       jest.fn().mockResolvedValue({
@@ -138,6 +141,14 @@ describe('ResumeAnalysisService', () => {
             findByUserId: jest.fn().mockResolvedValue(null),
           },
         },
+        ...(enqueue
+          ? [
+              {
+                provide: ResumeJobClient,
+                useValue: { enqueue },
+              },
+            ]
+          : []),
       ],
     }).compile();
 
@@ -150,6 +161,7 @@ describe('ResumeAnalysisService', () => {
       cacheSet,
       upsert,
       buildResumeContext,
+      enqueue,
       pdf: module.get(PdfExtractService),
     };
   };
@@ -439,6 +451,56 @@ describe('ResumeAnalysisService', () => {
 
     expect(upsert).toHaveBeenCalled();
     expect(charge).toHaveBeenCalled();
-    expect(result.interviewCoins).toBe(90);
+    expect('interviewCoins' in result && result.interviewCoins).toBe(90);
+  });
+
+  it('enqueues on BullMQ and does not run LangGraph when a job client is present', async () => {
+    const enqueue = jest.fn().mockResolvedValue({
+      jobId: 'user-1__req-q',
+      status: 'queued',
+    });
+    const { service, generateStructured, charge } = await build({ enqueue });
+
+    const result = await service.analyzeForUser({
+      userId: 'user-1',
+      resumeText,
+      requestId: 'req-q',
+    });
+
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        requestId: 'req-q',
+        rawText: resumeText,
+      }),
+    );
+    expect(generateStructured).not.toHaveBeenCalled();
+    expect(charge).not.toHaveBeenCalled();
+    expect(result).toEqual({ jobId: 'user-1__req-q', status: 'queued' });
+  });
+
+  it('deletes the temp PDF when enqueue fails', async () => {
+    const enqueue = jest.fn().mockRejectedValue(
+      new ServiceUnavailableException({
+        message: 'queue down',
+        error: 'QUEUE_UNAVAILABLE',
+      }),
+    );
+    const { service, pdf } = await build({ enqueue });
+
+    await expect(
+      service.analyzeForUser({
+        userId: 'user-1',
+        requestId: 'req-q-fail',
+        file: {
+          path: '/tmp/temporary-resume-queue.pdf',
+          originalname: 'resume.pdf',
+          mimetype: 'application/pdf',
+          size: 1000,
+        } as Express.Multer.File,
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(pdf.unlink).toHaveBeenCalledWith('/tmp/temporary-resume-queue.pdf');
   });
 });

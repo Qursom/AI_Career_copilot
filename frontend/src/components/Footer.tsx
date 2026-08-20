@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export default function Footer() {
   return (
-    <footer className="relative z-10 border-t border-white/5 bg-[#05050a]/60 backdrop-blur-xl mt-24">
-      <div className="max-w-6xl mx-auto px-6 py-12 grid gap-10 md:grid-cols-4">
+    <footer className="relative z-10 border-t border-white/8 bg-[#05050a]/70 backdrop-blur-xl mt-16">
+      <div className="max-w-6xl mx-auto px-6 py-14 grid gap-10 md:grid-cols-4">
         <div className="md:col-span-2 space-y-4">
           <Link
             href="/"
@@ -27,9 +27,12 @@ export default function Footer() {
               Career <span className="text-gradient">Copilot</span>
             </span>
           </Link>
-          <p className="text-sm text-white/50 max-w-sm">
-            Your AI career sidekick. Roast, rewrite, score and match — in
-            seconds.
+          <p className="text-sm text-white/50 max-w-sm leading-relaxed">
+            The AI workspace for job seekers. Roast, rewrite, ATS-score, and
+            match any description — then apply with a number you can defend.
+          </p>
+          <p className="text-xs text-white/35">
+            Free to start · 150 interview coins · no credit card
           </p>
         </div>
 
@@ -83,9 +86,13 @@ export default function Footer() {
       <div className="border-t border-white/5">
         <div className="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/40">
           <p>© {new Date().getFullYear()} AI Career Copilot. All rights reserved.</p>
-          <p className="flex items-center gap-2">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            All systems operational
+          <p className="flex items-center gap-4">
+            <span>Privacy</span>
+            <span>Terms</span>
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              All systems operational
+            </span>
           </p>
         </div>
       </div>

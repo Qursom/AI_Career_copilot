@@ -12,6 +12,9 @@ export function userMessageForUpstreamError(err: LlmUpstreamError): string {
     return 'Invalid or missing API key. For Google set GEMINI_API_KEY; the app reads LLM config from backend/.env — restart after changes.';
   }
   if (/\b404\b/.test(m) && lower.includes('model')) {
+    if (m.startsWith('Groq ') || lower.includes('groq')) {
+      return 'Groq model not found. Set GROQ_MODEL to a name your key supports and restart.';
+    }
     return 'Gemini model not found. Set GEMINI_MODEL to a name your key supports (try gemini-3.6-flash) and restart.';
   }
   if (
@@ -33,8 +36,12 @@ export function userMessageForUpstreamError(err: LlmUpstreamError): string {
     return 'Network error calling the model API. Check your connection and that outbound HTTPS is allowed.';
   }
 
-  const raw = m.startsWith('Gemini call failed: ')
-    ? m.slice('Gemini call failed: '.length).trim()
-    : m;
+  const raw = stripProviderPrefix(m);
   return raw.length > 800 ? `${raw.slice(0, 800)}…` : raw;
+}
+
+function stripProviderPrefix(message: string): string {
+  return message
+    .replace(/^(Gemini|Groq) call failed:\s*/i, '')
+    .trim();
 }

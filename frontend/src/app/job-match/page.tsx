@@ -115,11 +115,9 @@ function JobMatchTool() {
         <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight">
           Does your resume <span className="text-gradient">actually match</span>?
         </h1>
-        <p className="mt-4 text-white/60 max-w-2xl">
-          Paste a job description and upload or paste your resume. We&apos;ll
-          score the match, pull out your strongest signals, and flag gaps to
-          fix before you hit submit, grounded by retrieved public labor-market
-          role data.
+        <p className="mt-4 text-white/60 max-w-2xl leading-relaxed">
+          Paste a job description and your resume. Get a match score, your
+          strongest signals, and the gaps to close before you hit submit.
         </p>
         {profile && (
           <p className="mt-3 text-sm text-indigo-200/80">

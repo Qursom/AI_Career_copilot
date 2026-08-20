@@ -6,11 +6,15 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  # Session/cache store and BullMQ broker for resume analysis.
+  # AOF keeps queued jobs across container restarts.
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
 
   qdrant:
     image: qdrant/qdrant:v1.13.4
@@ -22,4 +26,5 @@ services:
 
 volumes:
   mongo_data:
+  redis_data:
   qdrant_data:

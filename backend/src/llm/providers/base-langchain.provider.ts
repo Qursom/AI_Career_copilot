@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { ZodSchema } from 'zod';
@@ -11,21 +12,27 @@ import {
 const JSON_INSTRUCTION =
   'Return ONLY a JSON object matching the expected shape. Use the exact key names from the instructions. No preamble, no markdown fences.';
 
+export type StructuredOutputMethod =
+  | 'jsonSchema'
+  | 'jsonMode'
+  | 'functionCalling';
+
 /**
- * Shared LangChain chat path for Gemini and Groq. Tries native structured
- * output first, then falls back to invoke + JSON parse + Zod so a provider
- * that cannot bind a schema still works.
+ * Shared LangChain chat path for Gemini and Groq.
+ *
+ * Native `withStructuredOutput` is the default. If the provider cannot bind
+ * the Zod schema (transforms, unsupported json_schema, etc.) or the API
+ * rejects structured-output mode, we fall back to invoke + JSON parse + Zod.
+ * Rate limits, auth failures, and timeouts are not retried as a second call.
  */
 export abstract class BaseLangChainProvider implements LlmProvider {
   abstract readonly name: string;
   protected abstract readonly model: BaseChatModel;
   protected abstract readonly defaultTimeoutMs: number;
-  /**
-   * Native `withStructuredOutput` is opt-in. Groq's current model returns
-   * JSON as text; Zod 4 also does not always bind through LangChain's
-   * json-schema converter. Gemini still forces JSON via `json: true`.
-   */
-  protected readonly preferNativeStructuredOutput = false;
+  protected readonly preferNativeStructuredOutput = true;
+  /** Passed to LangChain `withStructuredOutput`. Undefined = provider default. */
+  protected readonly structuredOutputMethod?: StructuredOutputMethod;
+  private readonly structuredLogger = new Logger(BaseLangChainProvider.name);
 
   async generateStructured<T>({
     system,
@@ -39,16 +46,7 @@ export abstract class BaseLangChainProvider implements LlmProvider {
       new HumanMessage(prompt),
     ];
 
-    let structured: { invoke: (input: unknown) => Promise<unknown> } | null =
-      null;
-    if (this.preferNativeStructuredOutput) {
-      try {
-        structured = this.model.withStructuredOutput(schema as never);
-      } catch {
-        structured = null;
-      }
-    }
-
+    const structured = this.bindStructuredOutput(schema);
     if (structured) {
       try {
         const raw = await withTimeout(
@@ -69,10 +67,18 @@ export abstract class BaseLangChainProvider implements LlmProvider {
         ) {
           throw err;
         }
-        throw new LlmUpstreamError(
-          `${this.errorLabel} call failed: ${err instanceof Error ? err.message : String(err)}`,
-          err,
-        );
+        if (isUnsupportedStructuredOutputError(err)) {
+          this.structuredLogger.warn(
+            `${this.errorLabel} native structured output is unavailable; falling back to JSON parse. ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        } else {
+          throw new LlmUpstreamError(
+            `${this.errorLabel} call failed: ${err instanceof Error ? err.message : String(err)}`,
+            err,
+          );
+        }
       }
     }
 
@@ -99,6 +105,28 @@ export abstract class BaseLangChainProvider implements LlmProvider {
     if (this.name === 'gemini') return 'Gemini';
     if (this.name === 'groq') return 'Groq';
     return this.name;
+  }
+
+  private bindStructuredOutput<T>(
+    schema: ZodSchema<T>,
+  ): { invoke: (input: unknown) => Promise<unknown> } | null {
+    if (!this.preferNativeStructuredOutput) return null;
+    try {
+      const options = this.structuredOutputMethod
+        ? { name: 'structured_output', method: this.structuredOutputMethod }
+        : { name: 'structured_output' };
+      return this.model.withStructuredOutput(
+        schema as never,
+        options as never,
+      );
+    } catch (err) {
+      this.structuredLogger.debug(
+        `${this.errorLabel} withStructuredOutput bind failed; using JSON parse. ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return null;
+    }
   }
 }
 
@@ -174,7 +202,32 @@ export function messageContentToText(content: unknown): string {
   return content == null ? '' : JSON.stringify(content);
 }
 
-function formatZodIssues(error: { issues: { path: PropertyKey[]; message: string }[] }): string {
+/** True when the API/SDK cannot do structured output, so JSON parse is valid. */
+export function isUnsupportedStructuredOutputError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  const lower = message.toLowerCase();
+  if (/\b(401|403|429)\b/.test(message)) return false;
+  if (lower.includes('rate limit') || lower.includes('quota')) return false;
+  if (lower.includes('api key') || lower.includes('unauthorized')) return false;
+  return (
+    lower.includes('json_schema') ||
+    lower.includes('json schema') ||
+    lower.includes('jsonmode') ||
+    lower.includes('json mode') ||
+    lower.includes('response_format') ||
+    lower.includes('response schema') ||
+    lower.includes('structured output') ||
+    (lower.includes('not supported') &&
+      (lower.includes('json') ||
+        lower.includes('tool') ||
+        lower.includes('schema') ||
+        lower.includes('function')))
+  );
+}
+
+function formatZodIssues(error: {
+  issues: { path: PropertyKey[]; message: string }[];
+}): string {
   return error.issues
     .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
     .join('; ');

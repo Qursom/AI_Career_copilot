@@ -71,6 +71,31 @@ export interface ResumeAnalysis {
   interviewCoins?: number;
 }
 
+export interface ResumeJobAccepted {
+  jobId: string;
+  status: "queued" | "active";
+}
+
+export interface ResumeJobStatus {
+  jobId: string;
+  status: "queued" | "active" | "completed" | "failed";
+  progress?: { step: string; percent: number };
+  result?: ResumeAnalysis;
+  error?: { code: string; message: string };
+}
+
+export function isResumeJobAccepted(
+  value: unknown,
+): value is ResumeJobAccepted {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.jobId === "string" &&
+    typeof v.status === "string" &&
+    !("atsScore" in v)
+  );
+}
+
 export interface AnalyzeResumeInput {
   resume: string;
   role?: string;
@@ -268,6 +293,66 @@ async function request<T>(
   return body.data;
 }
 
+export type ResumeJobProgressHandler = (progress: {
+  step: string;
+  percent: number;
+}) => void;
+
+const POLL_INTERVAL_MS = 1_000;
+const POLL_TIMEOUT_MS = 180_000;
+
+async function submitResumeAnalysis(
+  path: string,
+  init: RequestInit,
+  auth?: AuthHeaders,
+  onProgress?: ResumeJobProgressHandler,
+): Promise<ResumeAnalysis> {
+  const data = await request<ResumeAnalysis | ResumeJobAccepted>(
+    path,
+    init,
+    auth,
+  );
+  if (!isResumeJobAccepted(data)) return data;
+  onProgress?.({ step: data.status, percent: data.status === "active" ? 10 : 0 });
+  return pollResumeJob(data.jobId, auth, onProgress);
+}
+
+async function pollResumeJob(
+  jobId: string,
+  auth?: AuthHeaders,
+  onProgress?: ResumeJobProgressHandler,
+): Promise<ResumeAnalysis> {
+  const started = Date.now();
+  while (Date.now() - started < POLL_TIMEOUT_MS) {
+    const status = await request<ResumeJobStatus>(
+      `/resume/status/${encodeURIComponent(jobId)}`,
+      undefined,
+      auth,
+    );
+    if (status.progress) onProgress?.(status.progress);
+    if (status.status === "completed" && status.result) {
+      return status.result;
+    }
+    if (status.status === "failed") {
+      throw new ApiError({
+        status: 503,
+        code: status.error?.code ?? "LLM_ERROR",
+        message:
+          status.error?.message ??
+          "Resume analysis failed. Please try again.",
+        requestId: jobId,
+      });
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  throw new ApiError({
+    status: 504,
+    code: "LLM_TIMEOUT",
+    message: "Resume analysis is taking too long. Check back from this page, or retry.",
+    requestId: jobId,
+  });
+}
+
 // ---------- Public API surface ----------
 
 export const api = {
@@ -294,24 +379,42 @@ export const api = {
   getMyResume: (auth?: AuthHeaders) =>
     request<ResumeAnalysis>("/resume/me", undefined, auth),
 
-  analyzeResume: (input: AnalyzeResumeInput, auth?: AuthHeaders) =>
-    request<ResumeAnalysis>(
+  getResumeJob: (jobId: string, auth?: AuthHeaders) =>
+    request<ResumeJobStatus>(
+      `/resume/status/${encodeURIComponent(jobId)}`,
+      undefined,
+      auth,
+    ),
+
+  analyzeResume: (
+    input: AnalyzeResumeInput,
+    auth?: AuthHeaders,
+    onProgress?: ResumeJobProgressHandler,
+  ) =>
+    submitResumeAnalysis(
       "/resume/analyze",
       {
         method: "POST",
         body: JSON.stringify(input),
       },
       auth,
+      onProgress,
     ),
 
-  analyzeResumePdf: (file: File, role: string | undefined, auth?: AuthHeaders) => {
+  analyzeResumePdf: (
+    file: File,
+    role: string | undefined,
+    auth?: AuthHeaders,
+    onProgress?: ResumeJobProgressHandler,
+  ) => {
     const body = new FormData();
     body.append("resume", file);
     if (role) body.append("role", role);
-    return request<ResumeAnalysis>(
+    return submitResumeAnalysis(
       "/resume/upload",
       { method: "POST", body },
       auth,
+      onProgress,
     );
   },
 
@@ -327,14 +430,20 @@ export const api = {
   },
 
   /** @deprecated Prefer analyzeResumePdf — kept for compatibility with field name "file". */
-  analyzeResumePdfLegacy: (file: File, role: string | undefined, auth?: AuthHeaders) => {
+  analyzeResumePdfLegacy: (
+    file: File,
+    role: string | undefined,
+    auth?: AuthHeaders,
+    onProgress?: ResumeJobProgressHandler,
+  ) => {
     const body = new FormData();
     body.append("file", file);
     if (role) body.append("role", role);
-    return request<ResumeAnalysis>(
+    return submitResumeAnalysis(
       "/resume/analyze",
       { method: "POST", body },
       auth,
+      onProgress,
     );
   },
 

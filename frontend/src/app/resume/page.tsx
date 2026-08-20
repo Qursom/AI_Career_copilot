@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 
 type AnalysisState =
   | { status: "idle" }
-  | { status: "loading" }
+  | { status: "loading"; step?: string; percent?: number }
   | { status: "error"; error: ApiError | Error }
   | ({ status: "done" } & ResumeAnalysis);
 
@@ -68,24 +68,30 @@ function ResumeTool() {
   }, [user?.id, devUserId]);
 
   const handleAnalyze = async (payload: { text?: string; file?: File }) => {
-    setState({ status: "loading" });
+    setState({ status: "loading", step: "queued", percent: 0 });
     const idempotencyKey =
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `resume-${Date.now()}`;
     try {
       const auth = authHeaders();
+      const onProgress = (progress: { step: string; percent: number }) => {
+        setState({ status: "loading", step: progress.step, percent: progress.percent });
+      };
       const data = payload.file
-        ? await api.analyzeResumePdf(payload.file, role.trim() || undefined, {
-            ...auth,
-            idempotencyKey,
-          })
+        ? await api.analyzeResumePdf(
+            payload.file,
+            role.trim() || undefined,
+            { ...auth, idempotencyKey },
+            onProgress,
+          )
         : await api.analyzeResume(
             {
               resume: payload.text ?? "",
               role: role.trim() || undefined,
             },
             { ...auth, idempotencyKey },
+            onProgress,
           );
       setState({ status: "done", ...data });
       if (typeof data.interviewCoins === "number") {
@@ -122,9 +128,9 @@ function ResumeTool() {
         <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight">
           ATS score, extract, <span className="text-gradient">and coach</span>.
         </h1>
-        <p className="mt-4 text-white/60 max-w-2xl">
-          Upload a PDF. We parse it on the server, score it against ATS
-          standards, and cache the result for instant dashboard loads.
+        <p className="mt-4 text-white/60 max-w-2xl leading-relaxed">
+          Upload a PDF or paste text. We parse it, score ATS fit, roast the
+          weak lines, and cache the result for your dashboard.
         </p>
         {profile && (
           <p className="mt-3 text-sm text-indigo-200/80">
@@ -151,7 +157,9 @@ function ResumeTool() {
 
         <div id="results" className="space-y-4">
           {state.status === "idle" && <EmptyState />}
-          {state.status === "loading" && <LoadingState />}
+          {state.status === "loading" && (
+            <LoadingState step={state.step} percent={state.percent} />
+          )}
           {state.status === "error" && (
             <ErrorBanner
               error={state.error}
@@ -363,31 +371,47 @@ function EmptyState() {
   );
 }
 
-const LOADING_MESSAGES = [
-  "Analyzing your resume...",
-  "Extracting resume information...",
-  "Evaluating ATS compatibility...",
-  "Generating recommendations...",
-];
+const LOADING_MESSAGES: Record<string, string> = {
+  queued: "Queued — waiting for a worker...",
+  running: "Analyzing your resume...",
+  extracting: "Extracting resume information...",
+  scoring: "Evaluating ATS compatibility...",
+  completed: "Finishing up...",
+};
 
-function LoadingState() {
+function LoadingState({
+  step,
+  percent,
+}: {
+  step?: string;
+  percent?: number;
+}) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+      setIndex((i) => (i + 1) % 4);
     }, 2200);
     return () => window.clearInterval(id);
   }, []);
 
+  const fallback = [
+    "Analyzing your resume...",
+    "Extracting resume information...",
+    "Evaluating ATS compatibility...",
+    "Generating recommendations...",
+  ][index];
+  const message =
+    (step && LOADING_MESSAGES[step]) || fallback;
+
   return (
     <div className="space-y-4">
       <div className="card p-6">
-        <p className="text-sm text-indigo-200/90 animate-pulse">
-          {LOADING_MESSAGES[index]}
-        </p>
+        <p className="text-sm text-indigo-200/90 animate-pulse">{message}</p>
         <p className="mt-2 text-xs text-white/40">
-          This usually takes a few seconds. Failed runs are not charged.
+          {typeof percent === "number" && percent > 0
+            ? `${percent}% · Failed runs are not charged.`
+            : "This usually takes a few seconds. Failed runs are not charged."}
         </p>
       </div>
       {[0, 1, 2].map((i) => (

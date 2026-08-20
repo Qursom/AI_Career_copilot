@@ -329,7 +329,8 @@ Templates: `backend/.env.example`, `frontend/.env.local.example`. Never commit s
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `MONGODB_URI` | Yes* | — | Mongo connection string (*or use Docker local URI) |
-| `REDIS_URL` | No | — | Redis URL; in-memory if unset |
+| `REDIS_URL` | No | — | Redis URL for cache and sessions; in-memory if unset |
+| `RESUME_QUEUE_ENABLED` | No | `false` | Set `true` to enqueue resume analysis on BullMQ (202 + poll). Default is inline 200 |
 | `LLM_PROVIDER` | No | `mock` | `mock`, `gemini`, or `groq` |
 | `GROQ_API_KEY` | If `groq` | — | Groq API key |
 | `GEMINI_API_KEY` | If `gemini` | — | Gemini API key |
