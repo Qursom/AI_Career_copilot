@@ -6,9 +6,7 @@ export class MemoryResumeStore implements ResumeStore {
 
   upsert(userId: string, analysis: ResumeAnalysis): Promise<ResumeAnalysis> {
     const existing = this.byUser.get(userId);
-    const next = existing
-      ? (Object.assign(existing, analysis) as ResumeAnalysis)
-      : analysis;
+    const next = existing ? Object.assign(existing, analysis) : analysis;
     this.byUser.set(userId, next);
     return Promise.resolve(next);
   }

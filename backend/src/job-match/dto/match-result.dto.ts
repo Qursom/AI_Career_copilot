@@ -44,4 +44,17 @@ export class MatchResultDto {
     description: 'Concrete edits the applicant should make.',
   })
   suggestions!: string[];
+
+  @ApiProperty({
+    required: false,
+    description: 'Remaining interview coins after this run.',
+  })
+  interviewCoins?: number;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'True when this JD+resume pair was already scored and served from cache (no coins charged).',
+  })
+  cached?: boolean;
 }

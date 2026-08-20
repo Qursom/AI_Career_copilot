@@ -1,3 +1,5 @@
+import type { CookieOptions } from 'express';
+
 export const SESSION_COOKIE_NAME = 'session_id';
 export const SESSION_KEY_PREFIX = 'session:';
 
@@ -10,12 +12,27 @@ export interface SessionPayload {
   interviewCoins: number;
 }
 
-export function sessionCookieOptions(isProd: boolean) {
+export type SessionSameSite = 'lax' | 'strict' | 'none';
+
+export interface SessionCookieConfig {
+  isProd: boolean;
+  sameSite: SessionSameSite;
+  ttlSeconds: number;
+}
+
+/**
+ * Single source of truth for the cookie attributes. `logout` must clear the
+ * cookie with the same name/path/sameSite/secure it was set with, otherwise
+ * browsers keep the stale cookie.
+ */
+export function sessionCookieOptions(cfg: SessionCookieConfig): CookieOptions {
+  // SameSite=None is only honoured on secure cookies.
+  const secure = cfg.isProd || cfg.sameSite === 'none';
   return {
-    httpOnly: true as const,
-    secure: isProd,
-    sameSite: 'lax' as const,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    secure,
+    sameSite: cfg.sameSite,
+    maxAge: cfg.ttlSeconds * 1000,
     path: '/',
   };
 }

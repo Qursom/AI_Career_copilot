@@ -1,4 +1,4 @@
-import Link from "next/link";
+import HeroAuthCta from "@/components/HeroAuthCta";
 
 const FEATURES = [
   {
@@ -75,25 +75,8 @@ export default function Home() {
             seconds, not weekends.
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/resume" className="btn-primary">
-              Analyze my resume
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-4 h-4"
-                aria-hidden="true"
-              >
-                <path d="M5 12h14M13 5l7 7-7 7" />
-              </svg>
-            </Link>
-            <Link href="/job-match" className="btn-ghost">
-              Try job match
-            </Link>
+          <div className="mt-8">
+            <HeroAuthCta />
           </div>
 
           <div className="mt-12 flex items-center gap-6 text-xs text-white/40">
@@ -204,12 +187,10 @@ export default function Home() {
               Free to try. No credit card. Honest feedback by default.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/resume" className="btn-primary">
-                Start with my resume
-              </Link>
-              <Link href="/job-match" className="btn-ghost">
-                Match against a job
-              </Link>
+              <HeroAuthCta
+                secondaryHref="/job-match"
+                secondaryLabel="Match against a job"
+              />
             </div>
           </div>
         </div>

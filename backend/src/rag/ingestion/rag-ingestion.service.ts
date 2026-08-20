@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { TypedConfigService } from '../../config/typed-config.service';
 import { COMPARISON_CORPUS_SEED } from '../data/comparison-corpus.seed';
+import { ADJACENT_ROLES_SEED } from '../data/adjacent-roles.seed';
 import { PUBLIC_ROLE_SKILLS_SEED } from '../data/public-role-skills.seed';
 import { EmbeddingService } from '../embeddings/embedding.service';
 import { RAG_VECTOR_STORE } from '../rag.tokens';
@@ -24,6 +25,7 @@ export class RagIngestionService {
     const normalized = this.normalizeRecords([
       ...PUBLIC_ROLE_SKILLS_SEED,
       ...COMPARISON_CORPUS_SEED,
+      ...ADJACENT_ROLES_SEED,
     ]);
 
     if (this.store.name === 'noop') {
@@ -33,8 +35,26 @@ export class RagIngestionService {
       return { processed: 0, upserted: 0 };
     }
 
-    const dim = this.config.get('GEMINI_EMBEDDING_DIMENSIONS');
+    // The collection is created from the provider's own width, so ingest and
+    // query cannot disagree about dimensions.
+    const dim = this.embeddings.dimensions;
     await this.store.ensureCollection(dim);
+
+    const existing = await this.store.describe();
+    if (existing.exists && existing.dimensions && existing.dimensions !== dim) {
+      throw new Error(
+        `Collection "${this.config.get('QDRANT_COLLECTION')}" holds ${existing.dimensions}-dimensional vectors but ${this.embeddings.providerName} produces ${dim}. Delete the collection or switch RAG_EMBEDDING_PROVIDER back before re-ingesting.`,
+      );
+    }
+    if (
+      existing.exists &&
+      existing.embeddingProvider &&
+      existing.embeddingProvider !== this.embeddings.providerName
+    ) {
+      throw new Error(
+        `Collection "${this.config.get('QDRANT_COLLECTION')}" was ingested with "${existing.embeddingProvider}" but the current provider is "${this.embeddings.providerName}". Delete the collection or switch RAG_EMBEDDING_PROVIDER back before re-ingesting.`,
+      );
+    }
 
     const points = [];
     for (const record of normalized) {
@@ -52,12 +72,19 @@ export class RagIngestionService {
           sourceName: record.sourceName,
           sourceUrl: record.sourceUrl,
           seniority: record.seniority ?? '',
+          embeddingProvider: this.embeddings.providerName,
         },
       });
     }
 
     const upserted = await this.store.upsert(points);
-    this.logger.log(`Ingested ${upserted} records into ${this.store.name}`);
+    await this.store.writeCorpusMeta({
+      embeddingProvider: this.embeddings.providerName,
+      dimensions: dim,
+    });
+    this.logger.log(
+      `Ingested ${upserted} records into ${this.store.name} (embeddings=${this.embeddings.providerName}, dim=${dim})`,
+    );
     return { processed: normalized.length, upserted };
   }
 

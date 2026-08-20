@@ -38,7 +38,9 @@ export class MongoUsersStore implements UsersStore {
     input: UserProfileInput,
     startingCoins: number,
   ): Promise<UserRecord> {
-    const existing = await this.model.findOne({ firebaseUid: input.firebaseUid });
+    const existing = await this.model.findOne({
+      firebaseUid: input.firebaseUid,
+    });
     if (existing) {
       this.logger.log(`Sign-in: loaded users.firebaseUid=${input.firebaseUid}`);
       return this.toRecord(existing);
@@ -58,7 +60,9 @@ export class MongoUsersStore implements UsersStore {
       return this.toRecord(created);
     } catch (err) {
       if (!isDuplicateKey(err)) throw err;
-      const raced = await this.model.findOne({ firebaseUid: input.firebaseUid });
+      const raced = await this.model.findOne({
+        firebaseUid: input.firebaseUid,
+      });
       if (!raced) throw err;
       return this.toRecord(raced);
     }
@@ -73,6 +77,18 @@ export class MongoUsersStore implements UsersStore {
     if (!updated) {
       const existing = await this.findByUid(firebaseUid);
       throw new InsufficientCoinsError(existing?.interviewCoins ?? 0, cost);
+    }
+    return this.toRecord(updated);
+  }
+
+  async refundCoins(firebaseUid: string, amount: number): Promise<UserRecord> {
+    const updated = await this.model.findOneAndUpdate(
+      { firebaseUid },
+      { $inc: { interviewCoins: amount } },
+      { new: true },
+    );
+    if (!updated) {
+      throw new Error(`Cannot refund unknown user ${firebaseUid}`);
     }
     return this.toRecord(updated);
   }

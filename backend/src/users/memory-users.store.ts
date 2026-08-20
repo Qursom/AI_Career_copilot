@@ -58,4 +58,13 @@ export class MemoryUsersStore implements UsersStore {
     row.interviewCoins -= cost;
     return Promise.resolve({ ...row });
   }
+
+  refundCoins(firebaseUid: string, amount: number): Promise<UserRecord> {
+    const row = this.byUid.get(firebaseUid);
+    if (!row) {
+      return Promise.reject(new Error(`Unknown user ${firebaseUid}`));
+    }
+    row.interviewCoins += amount;
+    return Promise.resolve({ ...row });
+  }
 }

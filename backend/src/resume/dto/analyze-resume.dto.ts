@@ -4,7 +4,8 @@ import { IsOptional, IsString, Length } from 'class-validator';
 
 export class AnalyzeResumeDto {
   @ApiPropertyOptional({
-    description: 'Raw resume text (plain text, markdown, or bullet list). Required unless a PDF is uploaded.',
+    description:
+      'Raw resume text (plain text, markdown, or bullet list). Required unless a PDF is uploaded.',
     minLength: 50,
     maxLength: 20_000,
     example: 'Jane Doe — Senior Frontend Engineer\n\nExperience…',

@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { Embeddings } from '@langchain/core/embeddings';
 import type { EmbeddingProvider } from './embedding.interface';
 
 export interface GeminiEmbeddingProviderOptions {
@@ -13,25 +14,35 @@ interface EmbedContentResponse {
 }
 
 /**
- * Calls the Gemini REST embedding endpoint directly. We bypass the
- * `@google/generative-ai` SDK because its `EmbedContentRequest` type does
- * not expose `outputDimensionality`, which is required to get Matryoshka-
- * reduced vectors (e.g. 768-dim) out of `gemini-embedding-001` /
- * `gemini-embedding-2-preview`. The SDK itself is also deprecated in favor
- * of `@google/genai`, so we'll revisit when we migrate the chat provider.
+ * LangChain `Embeddings` adapter for Gemini.
+ *
+ * `@langchain/google-genai`'s `GoogleGenerativeAIEmbeddings` does not pass
+ * `outputDimensionality`, which this corpus depends on (Matryoshka 768/1536
+ * vs the model's native 3072). The REST field is forwarded here so ingest
+ * and query stay in the same vector space.
  */
-export class GeminiEmbeddingProvider implements EmbeddingProvider {
+export class GeminiEmbeddingProvider
+  extends Embeddings
+  implements EmbeddingProvider
+{
   readonly name = 'gemini-embeddings';
+  readonly dimensions: number;
   private readonly logger = new Logger(GeminiEmbeddingProvider.name);
   private readonly endpoint: string;
 
   constructor(private readonly opts: GeminiEmbeddingProviderOptions) {
+    super({});
+    this.dimensions = opts.outputDimensionality;
     this.endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
       opts.model,
     )}:embedContent`;
   }
 
-  async embedText(text: string): Promise<number[]> {
+  embedText(text: string): Promise<number[]> {
+    return this.embedQuery(text);
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
     const cleaned = text.trim();
     if (!cleaned) return [];
 
@@ -65,6 +76,15 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     if (!values?.length) {
       throw new Error('Gemini embedding response contained no vector values.');
     }
+    if (values.length !== this.dimensions) {
+      throw new Error(
+        `Gemini embedding width ${values.length} does not match GEMINI_EMBEDDING_DIMENSIONS=${this.dimensions}.`,
+      );
+    }
     return values;
+  }
+
+  embedDocuments(documents: string[]): Promise<number[][]> {
+    return Promise.all(documents.map((doc) => this.embedQuery(doc)));
   }
 }

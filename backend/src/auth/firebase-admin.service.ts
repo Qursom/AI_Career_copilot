@@ -42,7 +42,7 @@ export class FirebaseAdminService {
       uid: decoded.uid,
       email: decoded.email ?? `${decoded.uid}@users.local`,
       name: (decoded.name as string | undefined)?.trim() || 'User',
-      picture: (decoded.picture as string | undefined) ?? '',
+      picture: decoded.picture ?? '',
     };
   }
 
@@ -97,7 +97,9 @@ export class FirebaseAdminService {
         }),
         projectId,
       });
-      this.logger.log(`Firebase Admin initialized from env for project ${projectId}`);
+      this.logger.log(
+        `Firebase Admin initialized from env for project ${projectId}`,
+      );
     } catch (err) {
       this.app = null;
       this.logger.error(

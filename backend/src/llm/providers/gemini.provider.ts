@@ -1,11 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { GenerateStructuredArgs, LlmProvider } from '../llm.interface';
-import {
-  LlmInvalidOutputError,
-  LlmTimeoutError,
-  LlmUpstreamError,
-} from '../llm.interface';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { BaseLangChainProvider } from './base-langchain.provider';
 
 export interface GeminiProviderOptions {
   apiKey: string;
@@ -14,130 +9,25 @@ export interface GeminiProviderOptions {
 }
 
 /**
- * Gemini provider that forces JSON output (`responseMimeType`) and validates
- * against the caller-supplied zod schema. Timeouts are enforced client-side.
+ * Gemini via LangChain `ChatGoogleGenerativeAI`. Structured JSON is handled
+ * by {@link BaseLangChainProvider} so Groq and Gemini share one parse path.
  */
-export class GeminiProvider implements LlmProvider {
+export class GeminiProvider extends BaseLangChainProvider {
   readonly name = 'gemini';
   private readonly logger = new Logger(GeminiProvider.name);
-  private readonly client: GoogleGenerativeAI;
-  private readonly modelName: string;
+  protected readonly model: ChatGoogleGenerativeAI;
+  protected readonly defaultTimeoutMs: number;
 
-  constructor(private readonly opts: GeminiProviderOptions) {
-    this.client = new GoogleGenerativeAI(opts.apiKey);
-    this.modelName = opts.model;
-  }
-
-  async generateStructured<T>({
-    system,
-    prompt,
-    schema,
-    timeoutMs,
-  }: GenerateStructuredArgs<T>): Promise<T> {
-    const effectiveTimeout = timeoutMs ?? this.opts.defaultTimeoutMs;
-    this.logger.debug(
-      `gemini.generateStructured model=${this.opts.model} timeout=${effectiveTimeout}ms input=${prompt.length} chars`,
-    );
-
-    const model = this.client.getGenerativeModel({
-      model: this.modelName,
-      systemInstruction: system,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.45,
-      },
+  constructor(opts: GeminiProviderOptions) {
+    super();
+    this.defaultTimeoutMs = opts.defaultTimeoutMs;
+    this.model = new ChatGoogleGenerativeAI({
+      apiKey: opts.apiKey,
+      model: opts.model,
+      temperature: 0.45,
+      json: true,
+      maxRetries: 0,
     });
-
-    const call = model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text:
-                `Return ONLY a JSON object matching the expected shape. ` +
-                `Use the exact key names from the instructions. ` +
-                `No preamble, no markdown fences.\n\n` +
-                `USER INPUT:\n${prompt}`,
-            },
-          ],
-        },
-      ],
-    });
-
-    let raw: string;
-    try {
-      const result = await withTimeout(call, effectiveTimeout);
-      try {
-        raw = result.response.text();
-      } catch (textErr) {
-        throw new LlmUpstreamError(
-          `Gemini call failed: ${textErr instanceof Error ? textErr.message : String(textErr)}`,
-          textErr,
-        );
-      }
-    } catch (err) {
-      if (err instanceof LlmTimeoutError) throw err;
-      if (err instanceof LlmUpstreamError) throw err;
-      throw new LlmUpstreamError(
-        `Gemini call failed: ${err instanceof Error ? err.message : String(err)}`,
-        err,
-      );
-    }
-
-    if (!raw || !String(raw).trim()) {
-      throw new LlmInvalidOutputError(
-        'Gemini returned empty text. The response may be blocked or the model had no output.',
-        raw,
-      );
-    }
-
-    const parsedJson = tryParseJson(raw);
-    if (parsedJson === undefined) {
-      throw new LlmInvalidOutputError(
-        'Gemini response was not valid JSON.',
-        raw,
-      );
-    }
-
-    const validated = schema.safeParse(parsedJson);
-    if (!validated.success) {
-      throw new LlmInvalidOutputError(
-        'Gemini output did not match the expected schema: ' +
-          validated.error.issues
-            .map((i) => `${i.path.join('.')}: ${i.message}`)
-            .join('; '),
-        raw,
-      );
-    }
-
-    return validated.data;
-  }
-}
-
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new LlmTimeoutError(`LLM call exceeded ${ms}ms`));
-    }, ms);
-    p.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e as Error);
-      },
-    );
-  });
-}
-
-function tryParseJson(raw: string): unknown {
-  const trimmed = raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return undefined;
+    this.logger.debug(`LangChain ChatGoogleGenerativeAI model=${opts.model}`);
   }
 }

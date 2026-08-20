@@ -5,7 +5,7 @@ import type { EmbeddingProvider } from './embedding.interface';
 export class MockEmbeddingProvider implements EmbeddingProvider {
   readonly name = 'mock-embeddings';
 
-  constructor(private readonly dimensions: number) {}
+  constructor(readonly dimensions: number) {}
 
   embedText(text: string): Promise<number[]> {
     const cleaned = text.trim();

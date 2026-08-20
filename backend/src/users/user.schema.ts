@@ -9,13 +9,13 @@ export class UserEntity {
   @Prop({ required: true, default: 'User' })
   name!: string;
 
-  @Prop({ required: true, lowercase: true })
+  @Prop({ required: true, lowercase: true, index: true })
   email!: string;
 
   @Prop({ required: false, default: '' })
   photoUrl!: string;
 
-  @Prop({ required: true, default: 100 })
+  @Prop({ required: true, default: 150 })
   interviewCoins!: number;
 }
 

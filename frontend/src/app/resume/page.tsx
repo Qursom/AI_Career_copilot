@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import UploadBox from "@/components/UploadBox";
 import ResultCard from "@/components/ResultCard";
 import BulletCard from "@/components/BulletCard";
 import ErrorBanner from "@/components/ErrorBanner";
+import RequireAuth from "@/components/RequireAuth";
 import RoleInput from "@/components/RoleInput";
-import { api, ApiError, type ResumeAnalysis, type UserProfile } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  type AuthHeaders,
+  type ResumeAnalysis,
+  type UserProfile,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 type AnalysisState =
@@ -17,25 +23,31 @@ type AnalysisState =
   | ({ status: "done" } & ResumeAnalysis);
 
 export default function ResumePage() {
-  const { session, loading: authLoading } = useAuth();
+  return (
+    <RequireAuth
+      title="Sign in to analyze resumes"
+      description="The Resume Agent caches your score and deducts 10 interview coins per run, so it needs your account."
+    >
+      <ResumeTool />
+    </RequireAuth>
+  );
+}
+
+function ResumeTool() {
+  const { user, devUserId, refreshUser } = useAuth();
   const [state, setState] = useState<AnalysisState>({ status: "idle" });
   const [role, setRole] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  const authHeaders = async () => {
-    if (!session) return undefined;
-    const token = await session.getIdToken();
-    return {
-      token: token || undefined,
-      userId: session.uid,
-    };
-  };
+  // Identity normally travels in the HTTP-only session cookie. The header is
+  // only used by the development fallback when Firebase is not configured.
+  const authHeaders = (): AuthHeaders | undefined =>
+    devUserId ? { userId: devUserId } : undefined;
 
   useEffect(() => {
-    if (!session) return;
     let cancelled = false;
     void (async () => {
-      const auth = await authHeaders();
+      const auth = authHeaders();
       try {
         const me = await api.getMe(auth);
         if (!cancelled) setProfile(me);
@@ -53,19 +65,28 @@ export default function ResumePage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.uid]);
+  }, [user?.id, devUserId]);
 
   const handleAnalyze = async (payload: { text?: string; file?: File }) => {
-    if (!session) return;
     setState({ status: "loading" });
+    const idempotencyKey =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `resume-${Date.now()}`;
     try {
-      const auth = await authHeaders();
+      const auth = authHeaders();
       const data = payload.file
-        ? await api.analyzeResumePdf(payload.file, role.trim() || undefined, auth)
-        : await api.analyzeResume({
-            resume: payload.text ?? "",
-            role: role.trim() || undefined,
-          }, auth);
+        ? await api.analyzeResumePdf(payload.file, role.trim() || undefined, {
+            ...auth,
+            idempotencyKey,
+          })
+        : await api.analyzeResume(
+            {
+              resume: payload.text ?? "",
+              role: role.trim() || undefined,
+            },
+            { ...auth, idempotencyKey },
+          );
       setState({ status: "done", ...data });
       if (typeof data.interviewCoins === "number") {
         setProfile((p) =>
@@ -77,6 +98,8 @@ export default function ResumePage() {
         const me = await api.getMe(auth);
         setProfile(me);
       }
+      // Keep the navbar coin badge in step with the charge.
+      void refreshUser().catch(() => {});
       requestAnimationFrame(() => {
         document
           .getElementById("results")
@@ -91,25 +114,6 @@ export default function ResumePage() {
   };
 
   const isLoading = state.status === "loading";
-
-  if (authLoading) {
-    return <p className="px-6 pt-10 text-white/50">Loading session…</p>;
-  }
-
-  if (!session) {
-    return (
-      <section className="max-w-xl mx-auto px-6 pt-16 text-center">
-        <h1 className="text-3xl font-semibold">Sign in to analyze resumes</h1>
-        <p className="mt-3 text-white/60">
-          The Resume Agent needs your user id to cache scores and deduct 10
-          interview coins per run.
-        </p>
-        <Link href="/login" className="btn-primary mt-8 inline-flex">
-          Go to sign in
-        </Link>
-      </section>
-    );
-  }
 
   return (
     <section className="max-w-5xl mx-auto px-6 pt-10 pb-20">
@@ -276,6 +280,30 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
       />
 
       <BulletCard
+        title="Experience"
+        tone="info"
+        items={data.experience ?? []}
+        emptyHint="No experience extracted."
+        icon={<path d="M12 6v12 M6 12h12" />}
+      />
+
+      <BulletCard
+        title="Education"
+        tone="info"
+        items={data.education ?? []}
+        emptyHint="No education extracted."
+        icon={<path d="M12 6v12 M6 12h12" />}
+      />
+
+      <BulletCard
+        title="Projects"
+        tone="info"
+        items={data.projects ?? []}
+        emptyHint="No projects extracted."
+        icon={<path d="M12 6v12 M6 12h12" />}
+      />
+
+      <BulletCard
         title="Market Signals (RAG)"
         tone="info"
         items={data.marketSignals}
@@ -335,11 +363,34 @@ function EmptyState() {
   );
 }
 
+const LOADING_MESSAGES = [
+  "Analyzing your resume...",
+  "Extracting resume information...",
+  "Evaluating ATS compatibility...",
+  "Generating recommendations...",
+];
+
 function LoadingState() {
-  const rows = [0, 1, 2, 3];
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, 2200);
+    return () => window.clearInterval(id);
+  }, []);
+
   return (
     <div className="space-y-4">
-      {rows.map((i) => (
+      <div className="card p-6">
+        <p className="text-sm text-indigo-200/90 animate-pulse">
+          {LOADING_MESSAGES[index]}
+        </p>
+        <p className="mt-2 text-xs text-white/40">
+          This usually takes a few seconds. Failed runs are not charged.
+        </p>
+      </div>
+      {[0, 1, 2].map((i) => (
         <div key={i} className="card">
           <div className="h-4 w-32 rounded bg-white/5 animate-pulse" />
           <div className="mt-5 space-y-2">

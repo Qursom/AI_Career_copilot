@@ -1,14 +1,16 @@
 import { z } from 'zod';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { LlmInvalidOutputError, LlmTimeoutError } from '../llm.interface';
 import { GeminiProvider } from './gemini.provider';
 
-const mockGenerateContent = jest.fn<Promise<unknown>, [unknown?]>();
+const mockInvoke = jest.fn<Promise<unknown>, [unknown?]>();
 
-jest.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-    getGenerativeModel: jest.fn().mockReturnValue({
-      generateContent: (req: unknown) => mockGenerateContent(req),
-    }),
+jest.mock('@langchain/google-genai', () => ({
+  ChatGoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+    withStructuredOutput: () => {
+      throw new Error('unit-test: skip native structured output');
+    },
+    invoke: (req: unknown) => mockInvoke(req),
   })),
 }));
 
@@ -22,19 +24,30 @@ describe('GeminiProvider (unit, mocked API)', () => {
   const tinySchema = z.object({ reply: z.string().min(1) });
 
   beforeEach(() => {
-    mockGenerateContent.mockReset();
+    mockInvoke.mockReset();
   });
 
   afterEach(() => {
-    mockGenerateContent.mockReset();
+    mockInvoke.mockReset();
+  });
+
+  it('constructs LangChain ChatGoogleGenerativeAI', () => {
+    new GeminiProvider({
+      apiKey: 'test-key',
+      model: 'gemini-3.6-flash',
+      defaultTimeoutMs: 30_000,
+    });
+    expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'test-key',
+        model: 'gemini-3.6-flash',
+        json: true,
+      }),
+    );
   });
 
   it('returns data when Gemini returns valid JSON for the schema', async () => {
-    mockGenerateContent.mockResolvedValue({
-      response: {
-        text: () => '{"reply": "ok"}',
-      },
-    });
+    mockInvoke.mockResolvedValue({ content: '{"reply": "ok"}' });
 
     const provider = new GeminiProvider({
       apiKey: 'test-key',
@@ -49,13 +62,11 @@ describe('GeminiProvider (unit, mocked API)', () => {
     });
 
     expect(out).toEqual({ reply: 'ok' });
-    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
   });
 
   it('throws LlmInvalidOutputError when response is not JSON', async () => {
-    mockGenerateContent.mockResolvedValue({
-      response: { text: () => 'not json' },
-    });
+    mockInvoke.mockResolvedValue({ content: 'not json' });
 
     const provider = new GeminiProvider({
       apiKey: 'k',
@@ -73,9 +84,7 @@ describe('GeminiProvider (unit, mocked API)', () => {
   });
 
   it('throws LlmInvalidOutputError when JSON does not match schema', async () => {
-    mockGenerateContent.mockResolvedValue({
-      response: { text: () => '{"wrong": true}' },
-    });
+    mockInvoke.mockResolvedValue({ content: '{"wrong": true}' });
 
     const provider = new GeminiProvider({
       apiKey: 'k',
@@ -93,10 +102,8 @@ describe('GeminiProvider (unit, mocked API)', () => {
   });
 
   it('strips ```json fences when present', async () => {
-    mockGenerateContent.mockResolvedValue({
-      response: {
-        text: () => '```json\n{"reply":"fenced"}\n```',
-      },
+    mockInvoke.mockResolvedValue({
+      content: '```json\n{"reply":"fenced"}\n```',
     });
 
     const provider = new GeminiProvider({
@@ -114,7 +121,7 @@ describe('GeminiProvider (unit, mocked API)', () => {
   });
 
   it('throws LlmUpstreamError when generateContent fails', async () => {
-    mockGenerateContent.mockRejectedValue(new Error('API boom'));
+    mockInvoke.mockRejectedValue(new Error('API boom'));
 
     const provider = new GeminiProvider({
       apiKey: 'k',
@@ -134,8 +141,8 @@ describe('GeminiProvider (unit, mocked API)', () => {
   });
 
   it('throws LlmTimeoutError when the call exceeds timeoutMs', async () => {
-    mockGenerateContent.mockReset();
-    mockGenerateContent.mockImplementation(
+    mockInvoke.mockReset();
+    mockInvoke.mockImplementation(
       () =>
         new Promise(() => {
           /* never resolves */
@@ -166,7 +173,7 @@ describeLive(
       const schema = z.object({ hello: z.string().min(1) });
       const provider = new GeminiProvider({
         apiKey: process.env.GEMINI_API_KEY!,
-        model: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
+        model: process.env.GEMINI_MODEL ?? 'gemini-3.6-flash',
         defaultTimeoutMs: 90_000,
       });
 

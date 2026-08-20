@@ -19,6 +19,13 @@ export interface RagVectorMetadata {
   sourceName: string;
   sourceUrl: string;
   seniority: string;
+  /**
+   * Embedding provider that produced this point's vector. Stored so retrieval
+   * can detect a corpus that was ingested with different embeddings than the
+   * ones being used to query it — a mismatch that otherwise looks like
+   * plausible but meaningless results.
+   */
+  embeddingProvider: string;
 }
 
 export interface RagEvidence {
@@ -29,6 +36,7 @@ export interface RagEvidence {
   sourceName: string;
   sourceUrl: string;
   score: number;
+  embeddingProvider: string;
 }
 
 export interface RagContext {

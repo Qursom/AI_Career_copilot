@@ -9,7 +9,8 @@ type UploadBoxProps = {
 };
 
 const MAX_CHARS = 20000;
-const MAX_BYTES = 2 * 1024 * 1024;
+const MAX_BYTES = 20 * 1024 * 1024;
+
 
 export default function UploadBox({
   onAnalyze,
@@ -34,31 +35,33 @@ export default function UploadBox({
     setError(null);
 
     if (file.size > MAX_BYTES) {
-      setError("File is larger than 2 MB.");
+      setError("File is larger than 20 MB.");
       return;
     }
 
     setFileName(file.name);
-    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      setPdfFile(file);
-      setText("");
-      return;
-    }
+    const isPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
 
-    setPdfFile(null);
     setIsExtracting(true);
     try {
       const content = await extractResumeText(file);
       const trimmed = content.slice(0, MAX_CHARS);
       setText(trimmed);
+      setPdfFile(isPdf ? file : null);
       if (!trimmed.trim()) {
         setError("No text found in this file. Try pasting the text below.");
       }
     } catch (err) {
       setText("");
+      // Keep the PDF so Analyze can still send it to the server parser.
+      setPdfFile(isPdf ? file : null);
       setError(
         err instanceof Error
-          ? err.message
+          ? isPdf
+            ? `${err.message} You can still click Analyze — the server will try to parse the PDF.`
+            : err.message
           : "Couldn't read this file. Try pasting the text below.",
       );
     } finally {
@@ -155,7 +158,7 @@ export default function UploadBox({
           )}
         </p>
         <p className="mt-1 text-xs text-white/40">
-          PDF, TXT, or MD up to 2&nbsp;MB
+          PDF, TXT, or MD up to 20&nbsp;MB
         </p>
       </div>
 
@@ -182,7 +185,8 @@ export default function UploadBox({
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-white/40">
-          PDF uploads are parsed on the server. Costs 10 interview coins.
+          PDFs show a text preview here, then the file is parsed again on the
+          server. Costs 10 interview coins.
         </p>
         <button
           type="button"

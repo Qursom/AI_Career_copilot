@@ -1,24 +1,15 @@
-import { randomUUID } from 'crypto';
-import {
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { CacheService } from '../cache/cache.service';
 import { TypedConfigService } from '../config/typed-config.service';
 import { UsersService } from '../users/users.service';
 import type { UserRecord } from '../users/users.store';
 import { FirebaseAdminService } from './firebase-admin.service';
-import {
-  SESSION_COOKIE_NAME,
-  SESSION_KEY_PREFIX,
-  sessionCookieOptions,
-  type SessionPayload,
-} from './session.constants';
+import { SessionService } from './session.service';
+import type { SessionPayload } from './session.constants';
 
 export interface AuthUserDto {
   id: string;
+  firebaseUid: string;
   name: string;
   email: string;
   photoUrl: string;
@@ -32,11 +23,20 @@ export class AuthService {
   constructor(
     private readonly firebase: FirebaseAdminService,
     private readonly users: UsersService,
-    private readonly cache: CacheService,
+    private readonly sessions: SessionService,
     private readonly config: TypedConfigService,
   ) {}
 
-  async loginWithIdToken(idToken: string, res: Response): Promise<{ user: AuthUserDto }> {
+  /**
+   * Exchanges a Firebase ID token for a server session.
+   *
+   * Identity comes exclusively from `verifyIdToken` — the request body only
+   * ever carries the token itself, never uid/email/name.
+   */
+  async loginWithIdToken(
+    idToken: string,
+    res: Response,
+  ): Promise<{ user: AuthUserDto }> {
     let identity;
     try {
       identity = await this.firebase.verifyIdToken(idToken);
@@ -58,11 +58,15 @@ export class AuthService {
       photoUrl: identity.picture,
     });
 
-    await this.createSession(record, res);
+    await this.sessions.createSession(this.toSession(record), res);
     return { user: this.toDto(record) };
   }
 
-  async me(firebaseUid: string): Promise<{ user: AuthUserDto }> {
+  /**
+   * Reads the authoritative user from MongoDB and slides the session TTL so an
+   * actively used session does not expire mid-visit.
+   */
+  async me(req: Request, firebaseUid: string): Promise<{ user: AuthUserDto }> {
     const record = await this.users.getMe(firebaseUid);
     if (!record) {
       throw new UnauthorizedException({
@@ -70,33 +74,32 @@ export class AuthService {
         error: 'UNAUTHORIZED',
       });
     }
+
+    const sessionId = this.sessions.readSessionId(req);
+    if (sessionId) {
+      await this.sessions.refreshSession(sessionId, this.toSession(record));
+    }
+
     return { user: this.toDto(record) };
   }
 
   async logout(req: Request, res: Response): Promise<{ ok: true }> {
-    const sessionId = this.readSessionId(req);
+    const sessionId = this.sessions.readSessionId(req);
     if (sessionId) {
-      await this.cache.del(`${SESSION_KEY_PREFIX}${sessionId}`);
+      await this.sessions.deleteSession(sessionId);
     }
-    res.clearCookie(SESSION_COOKIE_NAME, sessionCookieOptions(this.config.isProd));
+    this.sessions.clearCookie(res);
     return { ok: true };
   }
 
   async readSession(req: Request): Promise<SessionPayload | null> {
-    const sessionId = this.readSessionId(req);
+    const sessionId = this.sessions.readSessionId(req);
     if (!sessionId) return null;
-    const raw = await this.cache.get(`${SESSION_KEY_PREFIX}${sessionId}`);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as SessionPayload;
-    } catch {
-      return null;
-    }
+    return this.sessions.getSession(sessionId);
   }
 
-  private async createSession(record: UserRecord, res: Response): Promise<void> {
-    const sessionId = randomUUID();
-    const payload: SessionPayload = {
+  private toSession(record: UserRecord): SessionPayload {
+    return {
       userId: record.id,
       firebaseUid: record.firebaseUid,
       name: record.name,
@@ -104,29 +107,12 @@ export class AuthService {
       photoUrl: record.photoUrl,
       interviewCoins: record.interviewCoins,
     };
-    await this.cache.setWithTtl(
-      `${SESSION_KEY_PREFIX}${sessionId}`,
-      JSON.stringify(payload),
-      this.config.get('SESSION_TTL_SECONDS'),
-    );
-    res.cookie(
-      SESSION_COOKIE_NAME,
-      sessionId,
-      sessionCookieOptions(this.config.isProd),
-    );
-  }
-
-  private readSessionId(req: Request): string | undefined {
-    const fromCookies = req.cookies?.[SESSION_COOKIE_NAME];
-    if (typeof fromCookies === 'string' && fromCookies.trim()) {
-      return fromCookies.trim();
-    }
-    return undefined;
   }
 
   private toDto(record: UserRecord): AuthUserDto {
     return {
       id: record.id,
+      firebaseUid: record.firebaseUid,
       name: record.name,
       email: record.email,
       photoUrl: record.photoUrl,

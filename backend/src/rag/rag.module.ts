@@ -28,16 +28,19 @@ const embeddingProviderFactory: Provider = {
       return new MockEmbeddingProvider(dim);
     }
     const apiKey = config.get('GEMINI_API_KEY');
-    if (kind === 'gemini' && apiKey) {
-      logger.log('Using Gemini embeddings');
-      return new GeminiEmbeddingProvider({
-        apiKey,
-        model: config.get('GEMINI_EMBEDDING_MODEL'),
-        outputDimensionality: dim,
-      });
+    if (!apiKey) {
+      // Falling back to mock here would silently query a Gemini-embedded
+      // corpus with unrelated vectors, which reads as "no results".
+      throw new Error(
+        'RAG_EMBEDDING_PROVIDER=gemini requires GEMINI_API_KEY. Set the key, or set RAG_EMBEDDING_PROVIDER=mock and re-run "npm run rag:ingest".',
+      );
     }
-    logger.log('Embedding provider unavailable; using mock embeddings');
-    return new MockEmbeddingProvider(dim);
+    logger.log('Using Gemini embeddings');
+    return new GeminiEmbeddingProvider({
+      apiKey,
+      model: config.get('GEMINI_EMBEDDING_MODEL'),
+      outputDimensionality: dim,
+    });
   },
 };
 
@@ -46,13 +49,18 @@ const vectorStoreFactory: Provider = {
   inject: [TypedConfigService],
   useFactory: (config: TypedConfigService): VectorStore => {
     const logger = new Logger('RagModule');
-    const url = config.get('QDRANT_URL');
+    const url = config.get('QDRANT_URL')?.trim();
     if (!config.get('RAG_ENABLED') || !url) {
       logger.log('No Qdrant URL; RAG retrieval returns empty context.');
       return new NoopVectorStore();
     }
-    logger.log(`Using Qdrant at ${url}`);
-    return new QdrantVectorStore(url, config.get('QDRANT_COLLECTION'));
+    const apiKey = config.get('QDRANT_API_KEY');
+    logger.log(
+      apiKey
+        ? `Using Qdrant at ${url} (API key configured)`
+        : `Using Qdrant at ${url} (no API key — local/unauthenticated)`,
+    );
+    return new QdrantVectorStore(url, config.get('QDRANT_COLLECTION'), apiKey);
   },
 };
 

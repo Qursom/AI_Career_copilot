@@ -13,6 +13,10 @@ export class EmbeddingService {
     return this.provider.name;
   }
 
+  get dimensions(): number {
+    return this.provider.dimensions;
+  }
+
   embedText(text: string): Promise<number[]> {
     return this.provider.embedText(text);
   }

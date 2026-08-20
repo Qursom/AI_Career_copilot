@@ -1,8 +1,14 @@
 import {
+  HttpException,
+  HttpStatus,
+  Inject,
   Injectable,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { CacheService } from '../cache/cache.service';
+import { TypedConfigService } from '../config/typed-config.service';
 import {
   LlmInvalidOutputError,
   LlmTimeoutError,
@@ -14,6 +20,10 @@ import { MatchResultSchema, type MatchResult } from './job-match.schema';
 import { mergeMockWithRagFields } from '../rag/merge-mock-rag';
 import { RagService } from '../rag/rag.service';
 import { userMessageForUpstreamError } from '../llm/llm-upstream.user-message';
+import { InsufficientCoinsError } from '../users/users.store';
+import { UsersService } from '../users/users.service';
+import { jobMatchContentHash, jobPreview } from './content-hash';
+import { JOB_MATCH_STORE, type JobMatchStore } from './job-match.store';
 
 const SYSTEM_PROMPT = `You are a senior recruiter and technical hiring manager. Score how well a resume matches a job description. Return STRICT JSON with:
 
@@ -27,6 +37,21 @@ const SYSTEM_PROMPT = `You are a senior recruiter and technical hiring manager. 
 
 Be specific. Quote terms from the JD where relevant. Do not include any other keys. Do not wrap in markdown fences.`;
 
+const LAST_MATCH_KEY_PREFIX = 'job-match:last:';
+const HASH_MATCH_KEY_PREFIX = 'job-match:hash:';
+
+export type JobMatchScoreResult = MatchResult & {
+  interviewCoins: number;
+  cached: boolean;
+};
+
+export interface JobMatchHistoryItem {
+  contentHash: string;
+  score: number;
+  jobPreview: string;
+  createdAt: string;
+}
+
 @Injectable()
 export class JobMatchService {
   private readonly logger = new Logger(JobMatchService.name);
@@ -34,9 +59,196 @@ export class JobMatchService {
   constructor(
     private readonly llm: LlmService,
     private readonly rag: RagService,
+    private readonly cache: CacheService,
+    private readonly users: UsersService,
+    private readonly config: TypedConfigService,
+    @Inject(JOB_MATCH_STORE) private readonly matches: JobMatchStore,
   ) {}
 
-  async score(dto: ScoreMatchDto): Promise<MatchResult> {
+  /**
+   * `userId` is the Firebase UID resolved from the session by `AuthGuard` —
+   * it is never taken from the request body.
+   */
+  async score(
+    userId: string,
+    dto: ScoreMatchDto,
+    email?: string,
+  ): Promise<JobMatchScoreResult> {
+    await this.users.ensureUser(userId, email);
+    const contentHash = jobMatchContentHash(dto.jobDescription, dto.resume);
+
+    const cached = await this.lookupCached(userId, contentHash);
+    if (cached) {
+      await this.rememberLast(userId, cached);
+      const profile = await this.users.getMe(userId);
+      this.logger.log(
+        `job-match cache_hit userId=${userId} score=${cached.score}`,
+      );
+      return {
+        ...cached,
+        cached: true,
+        interviewCoins: profile?.interviewCoins ?? 0,
+      };
+    }
+
+    const cost = this.config.get('JOB_MATCH_COIN_COST');
+    try {
+      await this.users.assertSufficientCoins(userId, cost);
+    } catch (err) {
+      this.throwIfInsufficient(err);
+    }
+
+    const result = await this.runScore(dto);
+
+    let charged: { interviewCoins: number };
+    try {
+      charged = await this.users.chargeJobMatch(userId);
+    } catch (err) {
+      this.throwIfInsufficient(err);
+    }
+
+    try {
+      await this.matches.upsert({
+        userId,
+        contentHash,
+        result,
+        jobPreview: jobPreview(dto.jobDescription),
+        createdAt: new Date(),
+      });
+    } catch (err) {
+      this.logger.error(
+        `job-match persist_failed userId=${userId} reason=${err instanceof Error ? err.message : String(err)}`,
+      );
+      await this.refundAfterFailedPersist(userId);
+      throw new ServiceUnavailableException({
+        message: 'Could not save job match. Please retry.',
+        error: 'DATABASE_ERROR',
+      });
+    }
+
+    await this.rememberHashed(userId, contentHash, result);
+    await this.rememberLast(userId, result);
+    this.logger.log(`job-match scored score=${result.score} cached=false`);
+
+    return {
+      ...result,
+      cached: false,
+      interviewCoins: charged.interviewCoins,
+    };
+  }
+
+  /** Most recent match for the signed-in user. */
+  async getMine(userId: string): Promise<MatchResult> {
+    const stored = await this.matches.findLatestByUserId(userId);
+    if (stored) return stored.result;
+
+    const raw = await this.cache.get(this.lastMatchKey(userId));
+    if (raw) {
+      const parsed = this.parseResult(raw);
+      if (parsed) return parsed;
+      this.logger.warn(`Discarding unparseable cached job match for a user`);
+    }
+    throw new NotFoundException({
+      message: 'No job match found yet. Score a job description first.',
+      error: 'NOT_FOUND',
+    });
+  }
+
+  async listHistory(userId: string): Promise<JobMatchHistoryItem[]> {
+    const rows = await this.matches.listByUserId(userId, 20);
+    return rows.map((row) => ({
+      contentHash: row.contentHash,
+      score: row.result.score,
+      jobPreview: row.jobPreview,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  private async lookupCached(
+    userId: string,
+    contentHash: string,
+  ): Promise<MatchResult | null> {
+    const raw = await this.cache.get(this.hashMatchKey(userId, contentHash));
+    if (raw) {
+      const parsed = this.parseResult(raw);
+      if (parsed) return parsed;
+    }
+    const stored = await this.matches.findByUserAndHash(userId, contentHash);
+    if (!stored) return null;
+    await this.rememberHashed(userId, contentHash, stored.result);
+    return stored.result;
+  }
+
+  private async rememberHashed(
+    userId: string,
+    contentHash: string,
+    result: MatchResult,
+  ): Promise<void> {
+    await this.safeCacheSet(
+      this.hashMatchKey(userId, contentHash),
+      JSON.stringify(result),
+    );
+  }
+
+  private async rememberLast(
+    userId: string,
+    result: MatchResult,
+  ): Promise<void> {
+    await this.safeCacheSet(this.lastMatchKey(userId), JSON.stringify(result));
+  }
+
+  private async safeCacheSet(key: string, value: string): Promise<void> {
+    try {
+      await this.cache.set(key, value);
+    } catch (err) {
+      this.logger.warn(
+        `Could not cache job match: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  private parseResult(raw: string): MatchResult | null {
+    try {
+      const parsed = JSON.parse(raw) as MatchResult;
+      return typeof parsed.score === 'number' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private lastMatchKey(userId: string): string {
+    return `${LAST_MATCH_KEY_PREFIX}${userId}`;
+  }
+
+  private hashMatchKey(userId: string, contentHash: string): string {
+    return `${HASH_MATCH_KEY_PREFIX}${userId}:${contentHash}`;
+  }
+
+  private throwIfInsufficient(err: unknown): never {
+    if (err instanceof InsufficientCoinsError) {
+      throw new HttpException(
+        {
+          message: err.message,
+          error: 'INSUFFICIENT_COINS',
+        },
+        HttpStatus.PAYMENT_REQUIRED,
+      );
+    }
+    throw err as Error;
+  }
+
+  private async refundAfterFailedPersist(userId: string): Promise<void> {
+    try {
+      await this.users.refundJobMatch(userId);
+      this.logger.log(`job-match charge_refunded userId=${userId}`);
+    } catch (err) {
+      this.logger.error(
+        `job-match charge_refund_failed userId=${userId} reason=${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  private async runScore(dto: ScoreMatchDto): Promise<MatchResult> {
     const ragContext = await this.rag.buildJobMatchContext({
       resume: dto.resume,
       jobDescription: dto.jobDescription,

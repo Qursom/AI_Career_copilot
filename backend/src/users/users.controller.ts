@@ -26,6 +26,7 @@ export class UsersController {
       photoUrl: record.photoUrl,
       interviewCoins: record.interviewCoins,
       resumeCoinCost: this.config.get('RESUME_COIN_COST'),
+      jobMatchCoinCost: this.config.get('JOB_MATCH_COIN_COST'),
     };
   }
 }

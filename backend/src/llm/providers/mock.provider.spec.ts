@@ -21,6 +21,51 @@ describe('MockLlmProvider', () => {
     expect(Array.isArray(out.missingSkills)).toBe(true);
   });
 
+  it('ignores TARGET ROLE phrases that appear inside the resume body', async () => {
+    const { buildResumeAnalysisUserPrompt } = await import(
+      '../../ai/langgraph/resume/prompts/resume.prompt'
+    );
+    const prompt = buildResumeAnalysisUserPrompt({
+      normalizedText: [
+        'Priya Raman',
+        'Staff Data Engineer',
+        'priya@example.com',
+        'TARGET ROLE: this is a heading in the PDF and must not overflow the schema',
+        'Led Airflow and Snowflake pipelines. Built dbt models. Reduced cost 40%.',
+        'x'.repeat(500),
+      ].join('\n'),
+      role: 'Data Engineer',
+    });
+    const out = await provider.generateStructured({
+      system: 'resume',
+      prompt,
+      schema: ResumeAnalysisSchema,
+    });
+    expect(out.suggestedJobRole.length).toBeLessThanOrEqual(200);
+    expect(out.suggestedJobRole).toBe('Data Engineer');
+    expect(out.atsScore).toBeGreaterThanOrEqual(0);
+  });
+
+  it('still validates when the resume contains TARGET ROLE and no UI role was set', async () => {
+    const { buildResumeAnalysisUserPrompt } = await import(
+      '../../ai/langgraph/resume/prompts/resume.prompt'
+    );
+    const prompt = buildResumeAnalysisUserPrompt({
+      normalizedText: [
+        'Alex Chen',
+        'TARGET ROLE: ' + 'x'.repeat(400),
+        'Built Node.js APIs with TypeScript and PostgreSQL. Led a team of 4.',
+      ].join('\n'),
+    });
+    const out = await provider.generateStructured({
+      system: 'resume',
+      prompt,
+      schema: ResumeAnalysisSchema,
+    });
+    expect(out.suggestedJobRole.length).toBeLessThanOrEqual(200);
+    expect(out.fullName.length).toBeGreaterThan(0);
+  });
+
   it('produces valid match results', async () => {
     const out = await provider.generateStructured({
       system: 'match',

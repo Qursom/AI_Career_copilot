@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { TypedConfigService } from '../../config/typed-config.service';
 
 export interface ApiErrorBody {
   success: false;
@@ -33,6 +34,8 @@ export interface ApiErrorBody {
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('Exception');
 
+  constructor(private readonly config: TypedConfigService) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     if (host.getType() !== 'http') {
       this.logger.error(String(exception));
@@ -43,7 +46,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const req = http.getRequest<Request>();
     const res = http.getResponse<Response>();
 
-    const { status, code, message, details } = this.normalize(exception);
+    const { status, code, message, details, logMessage } =
+      this.normalize(exception);
 
     const body: ApiErrorBody = {
       success: false,
@@ -55,7 +59,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       },
     };
 
-    const logLine = `${req.method} ${req.originalUrl} ${status} ${code}: ${message} rid=${req.requestId ?? '-'}`;
+    const logLine = `${req.method} ${req.originalUrl} ${status} ${code}: ${logMessage ?? message} rid=${req.requestId ?? '-'}`;
     if (status >= 500) {
       this.logger.error(
         logLine,
@@ -73,7 +77,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     code: string;
     message: string;
     details?: unknown;
+    /** Detail kept for the log when the client-facing message is redacted. */
+    logMessage?: string;
   } {
+    if (isMulterFileTooLarge(exception)) {
+      return this.fileTooLarge();
+    }
+
     if (exception instanceof ZodError) {
       return {
         status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -92,6 +102,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const resp = exception.getResponse();
 
       if (typeof resp === 'string') {
+        if (status === HttpStatus.PAYLOAD_TOO_LARGE) {
+          return this.fileTooLarge(resp);
+        }
         return {
           status,
           code: this.codeFromStatus(status),
@@ -104,6 +117,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const message =
           (Array.isArray(r.message) && r.message.join(', ')) ||
           (typeof r.message === 'string' ? r.message : exception.message);
+        if (status === HttpStatus.PAYLOAD_TOO_LARGE) {
+          return this.fileTooLarge(
+            typeof message === 'string' ? message : undefined,
+          );
+        }
         return {
           status,
           code:
@@ -114,6 +132,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         };
       }
 
+      if (status === HttpStatus.PAYLOAD_TOO_LARGE) {
+        return this.fileTooLarge(exception.message);
+      }
+
       return {
         status,
         code: this.codeFromStatus(status),
@@ -121,12 +143,37 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
     }
 
-    // Unknown / programmer errors
+    // Unknown / programmer errors. Their messages routinely carry connection
+    // strings, file paths, and upstream payloads, so outside development the
+    // client gets a generic line and the detail stays in the log.
+    const detail =
+      exception instanceof Error ? exception.message : 'Unexpected error.';
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       code: 'INTERNAL_ERROR',
-      message:
-        exception instanceof Error ? exception.message : 'Unexpected error.',
+      message: this.config.isProd
+        ? 'Something went wrong. Please try again.'
+        : detail,
+      logMessage: detail,
+    };
+  }
+
+  private fileTooLarge(message?: string): {
+    status: number;
+    code: string;
+    message: string;
+  } {
+    const generic =
+      !message ||
+      message === 'Payload Too Large' ||
+      /payload too large/i.test(message);
+    const limitMb = this.config.get('RESUME_MAX_FILE_SIZE_MB');
+    return {
+      status: HttpStatus.PAYLOAD_TOO_LARGE,
+      code: 'FILE_TOO_LARGE',
+      message: generic
+        ? `File exceeds the ${limitMb} MB limit.`
+        : message,
     };
   }
 
@@ -137,6 +184,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       403: 'FORBIDDEN',
       404: 'NOT_FOUND',
       409: 'CONFLICT',
+      413: 'FILE_TOO_LARGE',
       422: 'VALIDATION_ERROR',
       429: 'RATE_LIMITED',
       500: 'INTERNAL_ERROR',
@@ -146,4 +194,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
     return map[status] ?? 'ERROR';
   }
+}
+
+function isMulterFileTooLarge(exception: unknown): boolean {
+  if (!exception || typeof exception !== 'object') return false;
+  const err = exception as { name?: unknown; code?: unknown };
+  return err.name === 'MulterError' && err.code === 'LIMIT_FILE_SIZE';
 }

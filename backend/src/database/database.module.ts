@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import dns from 'node:dns';
 import { Global, Logger, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -11,14 +12,16 @@ if (process.env.MONGODB_URI?.includes('mongodb+srv://')) {
   dns.setServers(['8.8.8.8', '1.1.1.1']);
 }
 
-const uri = process.env.MONGODB_URI?.trim();
+const uriRaw = process.env.MONGODB_URI?.trim();
+const uri =
+  uriRaw && uriRaw !== 'none' && uriRaw !== 'disabled' ? uriRaw : undefined;
 
 @Global()
 @Module({
   imports: uri
     ? [
         MongooseModule.forRoot(uri, {
-          serverSelectionTimeoutMS: 15_000,
+          serverSelectionTimeoutMS: 8_000,
           family: 4,
         }),
       ]

@@ -6,11 +6,12 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { FirebaseAdminService } from './firebase-admin.service';
+import { SessionService } from './session.service';
 
 @Module({
   imports: [CacheModule, UsersModule],
   controllers: [AuthController, UsersController],
-  providers: [FirebaseAdminService, AuthService, AuthGuard],
-  exports: [FirebaseAdminService, AuthService, AuthGuard],
+  providers: [FirebaseAdminService, SessionService, AuthService, AuthGuard],
+  exports: [FirebaseAdminService, SessionService, AuthService, AuthGuard],
 })
 export class AuthModule {}

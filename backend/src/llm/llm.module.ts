@@ -38,6 +38,7 @@ const llmProviderFactory: Provider = {
         );
         return new MockLlmProvider();
       }
+      logger.log('Using LangChain ChatGoogleGenerativeAI');
       return new GeminiProvider({
         apiKey,
         model: config.get('GEMINI_MODEL'),

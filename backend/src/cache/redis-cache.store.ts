@@ -8,7 +8,10 @@ export class RedisCacheStore implements CacheStore, OnModuleDestroy {
   private readonly client: Redis;
 
   constructor(url: string) {
-    this.client = new Redis(url, { maxRetriesPerRequest: 2, lazyConnect: true });
+    this.client = new Redis(url, {
+      maxRetriesPerRequest: 2,
+      lazyConnect: true,
+    });
     this.client.on('error', (err) => {
       this.logger.warn(`Redis error: ${err.message}`);
     });

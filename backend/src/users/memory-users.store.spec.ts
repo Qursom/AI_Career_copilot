@@ -55,4 +55,19 @@ describe('MemoryUsersStore', () => {
       InsufficientCoinsError,
     );
   });
+
+  it('refunds a charge back to the balance', async () => {
+    const store = new MemoryUsersStore();
+    await store.upsert('u1', 'a@b.c', 15);
+    await store.chargeCoins('u1', 10);
+
+    await expect(store.refundCoins('u1', 10)).resolves.toMatchObject({
+      interviewCoins: 15,
+    });
+  });
+
+  it('rejects a refund for an unknown user', async () => {
+    const store = new MemoryUsersStore();
+    await expect(store.refundCoins('nobody', 10)).rejects.toBeInstanceOf(Error);
+  });
 });

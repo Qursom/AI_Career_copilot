@@ -29,6 +29,8 @@ export interface UsersStore {
     startingCoins: number,
   ): Promise<UserRecord>;
   chargeCoins(firebaseUid: string, cost: number): Promise<UserRecord>;
+  /** Compensates a charge whose work could not be completed. */
+  refundCoins(firebaseUid: string, amount: number): Promise<UserRecord>;
 }
 
 export class InsufficientCoinsError extends Error {

@@ -60,4 +60,59 @@ describe('RagIngestionService', () => {
     expect(result.processed).toBe(0);
     expect(result.upserted).toBe(0);
   });
+
+  it('writes corpus metadata after ingesting and refuses a provider mismatch', async () => {
+    const writeCorpusMeta = jest.fn().mockResolvedValue(undefined);
+    const upsert = jest.fn().mockResolvedValue(4);
+    const describe = jest
+      .fn()
+      .mockResolvedValueOnce({
+        exists: true,
+        dimensions: 768,
+        pointCount: 4,
+        embeddingProvider: 'gemini-embeddings',
+      });
+    const store = {
+      name: 'qdrant',
+      describe,
+      ensureCollection: jest.fn().mockResolvedValue(undefined),
+      writeCorpusMeta,
+      upsert,
+      search: jest.fn(),
+    };
+    const embeddingsWithName = {
+      providerName: 'mock-embeddings',
+      dimensions: 768,
+      embedText: jest.fn().mockResolvedValue([0.1, 0.2]),
+    };
+
+    const mismatch = new RagIngestionService(
+      embeddingsWithName as unknown as EmbeddingService,
+      store as never,
+      { get: () => 'career_copilot_skills' } as unknown as TypedConfigService,
+    );
+
+    await expect(mismatch.ingestPublicDatasets()).rejects.toThrow(
+      /ingested with "gemini-embeddings"/,
+    );
+    expect(upsert).not.toHaveBeenCalled();
+
+    describe.mockResolvedValueOnce({
+      exists: true,
+      dimensions: 768,
+      pointCount: 4,
+      embeddingProvider: 'mock-embeddings',
+    });
+    const ok = new RagIngestionService(
+      embeddingsWithName as unknown as EmbeddingService,
+      store as never,
+      { get: () => 'career_copilot_skills' } as unknown as TypedConfigService,
+    );
+    const result = await ok.ingestPublicDatasets();
+    expect(result.upserted).toBe(4);
+    expect(writeCorpusMeta).toHaveBeenCalledWith({
+      embeddingProvider: 'mock-embeddings',
+      dimensions: 768,
+    });
+  });
 });

@@ -1,16 +1,75 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ErrorBanner from "@/components/ErrorBanner";
 import BulletCard from "@/components/BulletCard";
-import { api, ApiError, type MatchResult } from "@/lib/api";
+import RequireAuth from "@/components/RequireAuth";
+import ResumeTextArea from "@/components/ResumeTextArea";
+import {
+  api,
+  ApiError,
+  type AuthHeaders,
+  type JobMatchHistoryItem,
+  type MatchResult,
+  type UserProfile,
+} from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { matchBand } from "@/lib/match-band";
 
 export default function JobMatchPage() {
+  return (
+    <RequireAuth
+      title="Sign in to match jobs"
+      description="Job matches are scored against your CareerCopilotAI account so you can pick them back up later."
+    >
+      <JobMatchTool />
+    </RequireAuth>
+  );
+}
+
+function JobMatchTool() {
+  const { user, devUserId, refreshUser } = useAuth();
   const [resume, setResume] = useState("");
   const [jd, setJd] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<MatchResult | null>(null);
+  const [history, setHistory] = useState<JobMatchHistoryItem[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState<ApiError | Error | null>(null);
+
+  // Identity normally travels in the HTTP-only session cookie.
+  const authHeaders = (): AuthHeaders | undefined =>
+    devUserId ? { userId: devUserId } : undefined;
+
+  // Restore the user's most recent match so a refresh does not lose it.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const auth = authHeaders();
+      try {
+        const me = await api.getMe(auth);
+        if (!cancelled) setProfile(me);
+      } catch {
+        /* first visit */
+      }
+      try {
+        const previous = await api.getMyJobMatch(auth);
+        if (!cancelled) setResult(previous);
+      } catch {
+        /* nothing scored yet */
+      }
+      try {
+        const rows = await api.getMyJobMatchHistory(auth);
+        if (!cancelled) setHistory(rows);
+      } catch {
+        /* history is optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, devUserId]);
 
   const canMatch =
     resume.trim().length > 50 && jd.trim().length > 50 && !loading;
@@ -19,11 +78,28 @@ export default function JobMatchPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.scoreJobMatch({
-        jobDescription: jd,
-        resume,
-      });
+      const auth = authHeaders();
+      const data = await api.scoreJobMatch(
+        {
+          jobDescription: jd,
+          resume,
+        },
+        auth,
+      );
       setResult(data);
+      if (typeof data.interviewCoins === "number") {
+        setProfile((p) =>
+          p
+            ? { ...p, interviewCoins: data.interviewCoins ?? p.interviewCoins }
+            : p,
+        );
+      }
+      void refreshUser().catch(() => {});
+      try {
+        setHistory(await api.getMyJobMatchHistory(auth));
+      } catch {
+        /* keep existing history */
+      }
     } catch (err) {
       setResult(null);
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -40,10 +116,18 @@ export default function JobMatchPage() {
           Does your resume <span className="text-gradient">actually match</span>?
         </h1>
         <p className="mt-4 text-white/60 max-w-2xl">
-          Paste a job description and your resume. We&apos;ll score the match,
-          pull out your strongest signals, and flag gaps to fix before you hit
-          submit, grounded by retrieved public labor-market role data.
+          Paste a job description and upload or paste your resume. We&apos;ll
+          score the match, pull out your strongest signals, and flag gaps to
+          fix before you hit submit, grounded by retrieved public labor-market
+          role data.
         </p>
+        {profile && (
+          <p className="mt-3 text-sm text-indigo-200/80">
+            Interview coins: <strong>{profile.interviewCoins}</strong> (each
+            new score costs {profile.jobMatchCoinCost ?? 10}; identical
+            JD+resume pairs are free)
+          </p>
+        )}
       </div>
 
       <div className="mt-10 grid gap-4 md:grid-cols-2">
@@ -55,13 +139,18 @@ export default function JobMatchPage() {
           placeholder="We are looking for a Senior Frontend Engineer to join…"
           accent="from-blue-500/30 to-cyan-500/10"
         />
-        <TextArea
+        <ResumeTextArea
           label="Your resume"
-          hint="Plain text works best."
+          hint="Upload a PDF or paste text."
           value={resume}
           onChange={setResume}
           placeholder="Jane Doe — Senior Frontend Engineer…"
           accent="from-indigo-500/30 to-violet-500/10"
+          disabled={loading}
+          extractPdf={async (file) => {
+            const parsed = await api.extractResumePdf(file, authHeaders());
+            return parsed.text;
+          }}
         />
       </div>
 
@@ -130,7 +219,7 @@ export default function JobMatchPage() {
 
       {result && (
         <div className="mt-10 grid gap-4 md:grid-cols-[0.8fr_1fr]">
-          <ScoreCard score={result.score} />
+          <ScoreCard score={result.score} cached={result.cached} />
           <div className="space-y-4">
             <BulletCard
               title="Strengths"
@@ -183,6 +272,37 @@ export default function JobMatchPage() {
           </div>
         </div>
       )}
+
+      {history.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50 mb-3">
+            Recent matches
+          </h2>
+          <ul className="space-y-2">
+            {history.map((row) => {
+              const band = matchBand(row.score);
+              return (
+                <li
+                  key={row.contentHash}
+                  className="card px-4 py-3 flex items-center justify-between gap-4"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-white/80 truncate">
+                      {row.jobPreview || "Job description"}
+                    </p>
+                    <p className="text-xs text-white/40 mt-0.5">
+                      {band.label} · {new Date(row.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className="text-lg font-semibold tabular-nums shrink-0">
+                    {row.score}%
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
@@ -221,10 +341,17 @@ function TextArea({
   );
 }
 
-function ScoreCard({ score }: { score: number }) {
+function ScoreCard({
+  score,
+  cached,
+}: {
+  score: number;
+  cached?: boolean;
+}) {
   const radius = 54;
   const circ = 2 * Math.PI * radius;
   const offset = circ - (score / 100) * circ;
+  const { label, hint } = matchBand(score);
   return (
     <div className="card flex flex-col items-center justify-center text-center py-10">
       <span className="chip bg-indigo-500/15 text-indigo-200">Match score</span>
@@ -265,10 +392,13 @@ function ScoreCard({ score }: { score: number }) {
           </div>
         </div>
       </div>
-      <p className="mt-4 text-sm text-white/70 font-medium">Strong match</p>
-      <p className="mt-1 text-xs text-white/40 max-w-[14rem]">
-        Close a few gaps below to push this above 90%.
-      </p>
+      <p className="mt-4 text-sm text-white/70 font-medium">{label}</p>
+      <p className="mt-1 text-xs text-white/40 max-w-[14rem]">{hint}</p>
+      {cached && (
+        <p className="mt-3 text-[11px] text-indigo-200/70">
+          Returned from cache — no coins charged
+        </p>
+      )}
     </div>
   );
 }

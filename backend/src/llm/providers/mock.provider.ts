@@ -33,9 +33,11 @@ export class MockLlmProvider implements LlmProvider {
 
     const parsed = schema.safeParse(candidate);
     if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
+        .join('; ');
       throw new LlmInvalidOutputError(
-        'Mock provider produced output that did not match requested schema. ' +
-          'Update MockLlmProvider to cover the new schema.',
+        `Mock provider produced output that did not match requested schema (${issues}).`,
         JSON.stringify(candidate),
       );
     }
@@ -57,17 +59,29 @@ interface PromptCtx {
 }
 
 function parsePrompt(prompt: string): PromptCtx {
-  const roleMatch = prompt.match(/TARGET ROLE:\s*(.+)/i);
-  const role = roleMatch ? roleMatch[1].trim() : '';
-
-  const resumeMatch = prompt.match(
-    /RESUME:\s*([\s\S]*?)(?:\n\s*TARGET ROLE:|$)/i,
+  // The builder emits `\nTARGET ROLE: …\nTailor EVERY field`. Anything else
+  // named "TARGET ROLE" is resume content and must not become suggestedJobRole
+  // (Zod caps that field at 200 chars; overflowing it fails every retry).
+  const builderRole = prompt.match(
+    /\nTARGET ROLE:\s*(.+)\nTailor EVERY field/,
   );
-  const resume = resumeMatch ? resumeMatch[1].trim() : prompt;
+  const role = builderRole ? builderRole[1].trim().slice(0, 200) : '';
 
-  const jdMatch = prompt.match(
-    /JOB DESCRIPTION:\s*([\s\S]*?)(?:\n\s*RESUME:|$)/i,
+  const builderRoleAt = prompt.search(
+    /\nTARGET ROLE:\s*.+\nTailor EVERY field/,
   );
+  const noRoleAt = prompt.search(/\nNo target role provided\./);
+  const resumeEnd =
+    builderRoleAt >= 0
+      ? builderRoleAt
+      : noRoleAt >= 0
+        ? noRoleAt
+        : -1;
+  const resumeSection = resumeEnd >= 0 ? prompt.slice(0, resumeEnd) : prompt;
+  const resumeMatch = resumeSection.match(/RESUME:\s*([\s\S]*)/);
+  const resume = (resumeMatch ? resumeMatch[1] : resumeSection).trim();
+
+  const jdMatch = prompt.match(/JOB DESCRIPTION:\s*([\s\S]*?)(?:\nRESUME:|$)/);
   const jd = jdMatch ? jdMatch[1].trim() : '';
 
   const hay = `${role}\n${jd}\n${resume}`.toLowerCase();
@@ -833,13 +847,13 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
     education: ['See resume education — mock extraction'],
     roast,
     strengths: dedupe(strengths).slice(0, 5),
-    weaknesses: missingSkillLabels.slice(0, 4).map(
-      (label) => `Limited evidence of ${label} on the resume.`,
-    ),
+    weaknesses: missingSkillLabels
+      .slice(0, 4)
+      .map((label) => `Limited evidence of ${label} on the resume.`),
     improvements: dedupe(improvements).slice(0, 6),
     recommendations: dedupe(improvements).slice(0, 6),
     missingSkills: dedupe(missingSkillLabels).slice(0, 7),
-    suggestedJobRole: ctx.role || profile.label,
+    suggestedJobRole: (ctx.role || profile.label).slice(0, 200),
     marketSignals: marketSignals.slice(0, 5),
     priorityGaps: priorityGaps.slice(0, 5),
     citations,
@@ -855,7 +869,11 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
 }
 
 function guessName(resume: string): string {
-  const line = resume.split('\n').map((s) => s.trim()).find(Boolean) ?? '';
+  const line =
+    resume
+      .split('\n')
+      .map((s) => s.trim())
+      .find(Boolean) ?? '';
   const cut = line.split(/[—\-|,]/)[0]?.trim() ?? '';
   return cut.slice(0, 80) || 'Unknown candidate';
 }

@@ -9,7 +9,12 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService, type AuthUserDto } from './auth.service';
 import { AuthGuard } from './auth.guard';
@@ -21,11 +26,14 @@ import { LoginDto } from './dto/login.dto';
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  /** Tighter than the global throttle — token exchange is a credential endpoint. */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Exchange a Firebase ID token for an HTTP-only session cookie.',
   })
+  @ApiUnauthorizedResponse({ description: 'Firebase ID token was rejected.' })
   login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -36,8 +44,12 @@ export class AuthController {
   @Get('me')
   @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Return the current session user from MongoDB.' })
-  me(@CurrentUser() user: AuthUser): Promise<{ user: AuthUserDto }> {
-    return this.auth.me(user.userId);
+  @ApiUnauthorizedResponse({ description: 'Missing or expired session.' })
+  me(
+    @Req() req: Request,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ user: AuthUserDto }> {
+    return this.auth.me(req, user.userId);
   }
 
   @Post('logout')

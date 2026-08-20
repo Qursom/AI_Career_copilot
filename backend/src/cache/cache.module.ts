@@ -9,7 +9,7 @@ const cacheStoreProvider: Provider = {
   inject: [TypedConfigService],
   useFactory: (config: TypedConfigService) => {
     const logger = new Logger('CacheModule');
-    const url = config.get('REDIS_URL');
+    const url = config.get('REDIS_URL')?.trim();
     if (!url) {
       logger.warn('REDIS_URL unset; using in-memory cache');
       return new MemoryCacheStore();

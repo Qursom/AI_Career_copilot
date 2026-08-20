@@ -1,5 +1,6 @@
 import { Logger, Module, type Provider } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { isMongoConfigured } from '../config/mongo-enabled';
 import { TypedConfigService } from '../config/typed-config.service';
 import { MemoryUsersStore } from './memory-users.store';
 import { MongoUsersStore } from './mongo-users.store';
@@ -12,7 +13,7 @@ const usersStoreProvider: Provider = {
   inject: [TypedConfigService],
   useFactory: (config: TypedConfigService) => {
     const logger = new Logger('UsersModule');
-    if (!config.get('MONGODB_URI')) {
+    if (!isMongoConfigured(config.get('MONGODB_URI'))) {
       logger.warn('MONGODB_URI unset; using in-memory users store');
       return new MemoryUsersStore();
     }
@@ -21,12 +22,16 @@ const usersStoreProvider: Provider = {
   },
 };
 
-const mongoOn = Boolean(process.env.MONGODB_URI?.trim());
+const mongoOn = isMongoConfigured();
 
 @Module({
   imports: [
     ...(mongoOn
-      ? [MongooseModule.forFeature([{ name: UserEntity.name, schema: UserSchema }])]
+      ? [
+          MongooseModule.forFeature([
+            { name: UserEntity.name, schema: UserSchema },
+          ]),
+        ]
       : []),
   ],
   providers: [

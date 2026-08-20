@@ -104,6 +104,9 @@ export class ResumeAnalysisDto {
   @ApiProperty({ description: 'Notes explaining the ATS score and fixes.' })
   atsNotes!: string;
 
-  @ApiProperty({ required: false, description: 'Remaining interview coins after this run.' })
+  @ApiProperty({
+    required: false,
+    description: 'Remaining interview coins after this run.',
+  })
   interviewCoins?: number;
 }

@@ -46,8 +46,17 @@ async function bootstrap(): Promise<void> {
     defaultVersion: '1',
   });
 
+  // Credentialed CORS cannot use a wildcard origin — browsers reject the
+  // response outright, which would silently break the session cookie.
+  const corsOrigins = config.corsOrigins.filter((o) => o !== '*');
+  if (corsOrigins.length !== config.corsOrigins.length) {
+    logger.error(
+      'CORS_ORIGIN contains "*", which is invalid alongside credentialed requests. Ignoring it — list the frontend origin explicitly.',
+    );
+  }
+
   app.enableCors({
-    origin: config.corsOrigins,
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -55,6 +64,8 @@ async function bootstrap(): Promise<void> {
       'Authorization',
       'X-Request-Id',
       'x-user-id',
+      'Idempotency-Key',
+      'X-Idempotency-Key',
     ],
     exposedHeaders: ['X-Request-Id'],
     maxAge: 86_400,

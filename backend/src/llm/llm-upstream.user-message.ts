@@ -12,7 +12,7 @@ export function userMessageForUpstreamError(err: LlmUpstreamError): string {
     return 'Invalid or missing API key. For Google set GEMINI_API_KEY; the app reads LLM config from backend/.env — restart after changes.';
   }
   if (/\b404\b/.test(m) && lower.includes('model')) {
-    return 'Gemini model not found. Set GEMINI_MODEL to a name your key supports (try gemini-2.0-flash or gemini-1.5-flash) and restart.';
+    return 'Gemini model not found. Set GEMINI_MODEL to a name your key supports (try gemini-3.6-flash) and restart.';
   }
   if (
     m.includes(' 429') ||

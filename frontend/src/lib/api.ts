@@ -84,6 +84,15 @@ export interface MatchResult {
   priorityGaps: string[];
   citations: string[];
   suggestions: string[];
+  interviewCoins?: number;
+  cached?: boolean;
+}
+
+export interface JobMatchHistoryItem {
+  contentHash: string;
+  score: number;
+  jobPreview: string;
+  createdAt: string;
 }
 
 export interface ScoreMatchInput {
@@ -136,10 +145,12 @@ export interface UserProfile {
   photoUrl?: string;
   interviewCoins: number;
   resumeCoinCost?: number;
+  jobMatchCoinCost?: number;
 }
 
 export interface AuthUser {
   id: string;
+  firebaseUid: string;
   name: string;
   email: string;
   photoUrl: string;
@@ -149,7 +160,30 @@ export interface AuthUser {
 export type AuthHeaders = {
   token?: string;
   userId?: string;
+  idempotencyKey?: string;
 };
+
+// ---------- Session expiry notification ----------
+
+type UnauthorizedListener = () => void;
+
+const unauthorizedListeners = new Set<UnauthorizedListener>();
+
+/**
+ * Notifies subscribers when a *protected* endpoint rejects the session cookie,
+ * so the auth provider can drop its cached user instead of rendering a
+ * signed-in UI backed by a dead session. `/auth/*` is excluded: a 401 there is
+ * the normal "not signed in yet" answer, not an expiry.
+ */
+export function onSessionExpired(listener: UnauthorizedListener): () => void {
+  unauthorizedListeners.add(listener);
+  return () => unauthorizedListeners.delete(listener);
+}
+
+function notifySessionExpired(path: string): void {
+  if (path.startsWith("/auth/")) return;
+  for (const listener of unauthorizedListeners) listener();
+}
 
 async function request<T>(
   path: string,
@@ -168,6 +202,9 @@ async function request<T>(
   }
   if (auth?.userId) {
     headers["x-user-id"] = auth.userId;
+  }
+  if (auth?.idempotencyKey) {
+    headers["Idempotency-Key"] = auth.idempotencyKey;
   }
   const extra = init?.headers;
   if (extra && extra instanceof Headers) {
@@ -208,6 +245,9 @@ async function request<T>(
   }
 
   if (!res.ok || !body || body.success === false) {
+    if (res.status === 401) {
+      notifySessionExpired(path);
+    }
     if (body && body.success === false) {
       throw new ApiError({
         status: res.status,
@@ -266,6 +306,29 @@ export const api = {
 
   analyzeResumePdf: (file: File, role: string | undefined, auth?: AuthHeaders) => {
     const body = new FormData();
+    body.append("resume", file);
+    if (role) body.append("role", role);
+    return request<ResumeAnalysis>(
+      "/resume/upload",
+      { method: "POST", body },
+      auth,
+    );
+  },
+
+  /** Parse a PDF into plain text. No analysis and no coin charge. */
+  extractResumePdf: (file: File, auth?: AuthHeaders) => {
+    const body = new FormData();
+    body.append("resume", file);
+    return request<{ text: string }>(
+      "/resume/extract",
+      { method: "POST", body },
+      auth,
+    );
+  },
+
+  /** @deprecated Prefer analyzeResumePdf — kept for compatibility with field name "file". */
+  analyzeResumePdfLegacy: (file: File, role: string | undefined, auth?: AuthHeaders) => {
+    const body = new FormData();
     body.append("file", file);
     if (role) body.append("role", role);
     return request<ResumeAnalysis>(
@@ -284,4 +347,10 @@ export const api = {
       },
       auth,
     ),
+
+  getMyJobMatch: (auth?: AuthHeaders) =>
+    request<MatchResult>("/job-match/me", undefined, auth),
+
+  getMyJobMatchHistory: (auth?: AuthHeaders) =>
+    request<JobMatchHistoryItem[]>("/job-match/history", undefined, auth),
 };

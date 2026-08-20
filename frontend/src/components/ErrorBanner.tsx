@@ -32,10 +32,26 @@ function describe(error: ApiError | Error): {
   }
   if (error.isUpstream) {
     return {
-      title: "The AI provider is having a moment",
-      body:
-        error.message.trim() ||
-        "The upstream model call failed or timed out. Please try again.",
+      title: "Resume analysis failed",
+      body: "Please try again.",
+    };
+  }
+  if (error.code === "INSUFFICIENT_COINS" || error.status === 402) {
+    return {
+      title: "Not enough interview coins",
+      body: error.message || "You need more interview coins to run this.",
+    };
+  }
+  if (
+    error.code === "EMPTY_RESUME" ||
+    error.code === "PDF_EXTRACTION_FAILED" ||
+    error.code === "INVALID_FILE_TYPE" ||
+    error.code === "FILE_TOO_LARGE" ||
+    error.status === 400
+  ) {
+    return {
+      title: "Resume analysis failed",
+      body: error.message || "Please try again.",
     };
   }
   if (error.status === 0) {
