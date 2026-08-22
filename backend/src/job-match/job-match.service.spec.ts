@@ -25,6 +25,20 @@ const fakeMatch = {
   priorityGaps: ['Accessibility coverage is a top market gap'],
   citations: ['ESCO framework (https://esco.ec.europa.eu/)'],
   suggestions: ['add wcag bullet'],
+  requirements: [
+    {
+      requirement: 'TypeScript',
+      importance: 'required' as const,
+      status: 'matched' as const,
+      evidence: 'TypeScript',
+    },
+    {
+      requirement: 'React',
+      importance: 'required' as const,
+      status: 'matched' as const,
+      evidence: 'React',
+    },
+  ],
 };
 
 describe('JobMatchService', () => {
@@ -137,14 +151,17 @@ describe('JobMatchService', () => {
       return Promise.resolve(fakeMatch);
     });
     const svc = await buildService(generateStructured);
-    await expect(svc.score(USER_ID, input)).resolves.toEqual({
-      ...fakeMatch,
-      ...ragMerged,
-      cached: false,
-      interviewCoins: 140,
-    });
+    const scored = await svc.score(USER_ID, input);
+    expect(scored.cached).toBe(false);
+    expect(scored.interviewCoins).toBe(140);
+    expect(scored.score).toBeGreaterThanOrEqual(0);
+    expect(scored.score).toBeLessThanOrEqual(100);
+    expect(scored.marketSignals).toEqual(ragMerged.marketSignals);
+    expect(scored.citations).toEqual(ragMerged.citations);
     expect(generateStructured).toHaveBeenCalled();
-    expect(capturedPrompt).toContain('RAG EVIDENCE');
+    expect(capturedPrompt).toContain('=== JOB DESCRIPTION ===');
+    expect(capturedPrompt).toContain('=== CANDIDATE RESUME ===');
+    expect(capturedPrompt).toContain('not candidate evidence');
     expect(users.chargeJobMatch).toHaveBeenCalledTimes(1);
     expect(store.upsert).toHaveBeenCalledTimes(1);
   });
@@ -171,6 +188,7 @@ describe('JobMatchService', () => {
 
     await expect(svc.score(USER_ID, input)).resolves.toEqual({
       ...fakeMatch,
+      requirements: fakeMatch.requirements,
       cached: true,
       interviewCoins: 150,
     });
@@ -229,9 +247,11 @@ describe('JobMatchService', () => {
     const svc = await buildService(jest.fn().mockResolvedValue(fakeMatch));
 
     await expect(svc.score(USER_ID, input)).resolves.toMatchObject({
-      score: 80,
       cached: false,
     });
+    const scored = await svc.score(USER_ID, input);
+    expect(scored.score).toBeGreaterThanOrEqual(0);
+    expect(scored.score).toBeLessThanOrEqual(100);
   });
 
   it('refunds coins when persist fails', async () => {
@@ -258,7 +278,7 @@ describe('JobMatchService', () => {
     expect(users.chargeJobMatch).not.toHaveBeenCalled();
   });
 
-  it('when provider is gemini, prefers LLM RAG fields over stub', async () => {
+  it('uses RAG marketSignals and citations even when the LLM invents others', async () => {
     const fake = {
       ...fakeMatch,
       marketSignals: ['from LLM'],
@@ -268,10 +288,13 @@ describe('JobMatchService', () => {
     const svc = await buildService(jest.fn().mockResolvedValue(fake), {
       providerName: 'gemini',
     });
-    await expect(svc.score(USER_ID, input)).resolves.toMatchObject(fake);
+    await expect(svc.score(USER_ID, input)).resolves.toMatchObject({
+      marketSignals: ['signal'],
+      citations: ['citation'],
+    });
   });
 
-  it('when mock and RAG empty, keeps LLM RAG fields', async () => {
+  it('clears marketSignals and citations when RAG is empty', async () => {
     const fake = {
       ...fakeMatch,
       marketSignals: ['mock m'],
@@ -286,7 +309,10 @@ describe('JobMatchService', () => {
         citations: [],
       },
     });
-    await expect(svc.score(USER_ID, input)).resolves.toMatchObject(fake);
+    await expect(svc.score(USER_ID, input)).resolves.toMatchObject({
+      marketSignals: [],
+      citations: [],
+    });
   });
 
   it('converts LLM errors to 503', async () => {

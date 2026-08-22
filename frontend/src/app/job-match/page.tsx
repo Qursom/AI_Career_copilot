@@ -569,6 +569,42 @@ function MatchResults({ result }: { result: MatchResult }) {
         </div>
       </div>
 
+      {result.requirements && result.requirements.length > 0 && (
+        <div className="card">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-white/50">
+            Requirement match
+          </h3>
+          <ul className="mt-4 space-y-2">
+            {result.requirements.map((row) => (
+              <li
+                key={`${row.importance}-${row.requirement}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-sm"
+              >
+                <span className="min-w-0 text-white/80">
+                  {row.requirement}
+                  <span className="ml-2 text-[11px] uppercase tracking-widest text-white/35">
+                    {row.importance}
+                  </span>
+                </span>
+                <span
+                  className={`chip text-[11px] ${
+                    row.status === "matched"
+                      ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/30"
+                      : row.status === "partial"
+                        ? "bg-amber-500/15 text-amber-200 border-amber-400/30"
+                        : row.status === "unknown"
+                          ? "bg-white/10 text-white/60 border-white/15"
+                          : "bg-rose-500/15 text-rose-200 border-rose-400/30"
+                  }`}
+                >
+                  {row.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         <InsightList
           title="What already lands"

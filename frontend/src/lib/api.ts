@@ -101,6 +101,13 @@ export interface AnalyzeResumeInput {
   role?: string;
 }
 
+export interface MatchRequirement {
+  requirement: string;
+  importance: "required" | "preferred" | "responsibility" | "nice-to-have";
+  status: "matched" | "partial" | "missing" | "unknown";
+  evidence: string;
+}
+
 export interface MatchResult {
   score: number;
   strengths: string[];
@@ -109,6 +116,7 @@ export interface MatchResult {
   priorityGaps: string[];
   citations: string[];
   suggestions: string[];
+  requirements?: MatchRequirement[];
   interviewCoins?: number;
   cached?: boolean;
 }

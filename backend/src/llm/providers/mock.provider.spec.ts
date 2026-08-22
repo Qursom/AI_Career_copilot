@@ -69,11 +69,19 @@ describe('MockLlmProvider', () => {
   it('produces valid match results', async () => {
     const out = await provider.generateStructured({
       system: 'match',
-      prompt: 'JD and resume for a senior frontend engineer.',
+      prompt: [
+        '=== JOB DESCRIPTION ===',
+        'Senior Frontend Engineer. React TypeScript required.',
+        '=== CANDIDATE RESUME ===',
+        'Jane Doe. React TypeScript design systems.',
+        '=== EXTERNAL REFERENCE CONTEXT ===',
+        '(none supplied)',
+      ].join('\n'),
       schema: MatchResultSchema,
     });
     expect(out.strengths.length).toBeGreaterThan(0);
     expect(Array.isArray(out.suggestions)).toBe(true);
+    expect(Array.isArray(out.requirements)).toBe(true);
   });
 
   it('throws LlmInvalidOutputError when schema cannot be satisfied', async () => {

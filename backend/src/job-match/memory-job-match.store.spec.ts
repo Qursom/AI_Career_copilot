@@ -9,6 +9,7 @@ const result = (score: number): MatchResult => ({
   priorityGaps: [],
   citations: [],
   suggestions: ['s'],
+  requirements: [],
 });
 
 describe('MemoryJobMatchStore', () => {

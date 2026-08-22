@@ -47,6 +47,18 @@ export class MatchResultDto {
 
   @ApiProperty({
     required: false,
+    description: 'Structured JD vs resume requirement matches.',
+    type: 'array',
+  })
+  requirements?: Array<{
+    requirement: string;
+    importance: string;
+    status: string;
+    evidence: string;
+  }>;
+
+  @ApiProperty({
+    required: false,
     description: 'Remaining total coins after this run.',
   })
   interviewCoins?: number;

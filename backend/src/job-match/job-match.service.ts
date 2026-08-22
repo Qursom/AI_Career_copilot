@@ -17,25 +17,17 @@ import {
 import { LlmService } from '../llm/llm.service';
 import type { ScoreMatchDto } from './dto/score-match.dto';
 import { MatchResultSchema, type MatchResult } from './job-match.schema';
-import { mergeMockWithRagFields } from '../rag/merge-mock-rag';
 import { RagService } from '../rag/rag.service';
 import { userMessageForUpstreamError } from '../llm/llm-upstream.user-message';
 import { InsufficientCoinsError } from '../users/users.store';
 import { UsersService } from '../users/users.service';
 import { jobMatchContentHash, jobPreview } from './content-hash';
+import {
+  JOB_MATCH_SYSTEM_PROMPT,
+  buildJobMatchUserPrompt,
+} from './job-match.prompt';
+import { finalizeMatchResult } from './job-match.score';
 import { JOB_MATCH_STORE, type JobMatchStore } from './job-match.store';
-
-const SYSTEM_PROMPT = `You are a senior recruiter and technical hiring manager. Score how well a resume matches a job description. Return STRICT JSON with:
-
-- "score": integer 0–100 — overall match percentage.
-- "strengths": array of strings (1–10) — resume signals that fit the JD.
-- "gaps": array of strings (0–10) — requirements the resume does not cover.
-- "marketSignals": array of strings (0–10) — retrieved labor-market role expectations relevant to this JD.
-- "priorityGaps": array of strings (0–10) — high-priority market-backed gaps in the resume.
-- "citations": array of strings (0–10) — source citations used for market context.
-- "suggestions": array of strings (0–10) — concrete bullet-level edits to raise the score.
-
-Be specific. Quote terms from the JD where relevant. Do not include any other keys. Do not wrap in markdown fences.`;
 
 const LAST_MATCH_KEY_PREFIX = 'job-match:last:';
 const HASH_MATCH_KEY_PREFIX = 'job-match:hash:';
@@ -263,8 +255,8 @@ export class JobMatchService {
 
   private parseResult(raw: string): MatchResult | null {
     try {
-      const parsed = JSON.parse(raw) as MatchResult;
-      return typeof parsed.score === 'number' ? parsed : null;
+      const parsed = MatchResultSchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : null;
     } catch {
       return null;
     }
@@ -307,36 +299,28 @@ export class JobMatchService {
       resume: dto.resume,
       jobDescription: dto.jobDescription,
     });
-    const prompt =
-      `JOB DESCRIPTION:\n${dto.jobDescription}\n\n` +
-      `RESUME:\n${dto.resume}` +
-      (ragContext.promptContext ? `\n\n${ragContext.promptContext}` : '');
+    const prompt = buildJobMatchUserPrompt({
+      jobDescription: dto.jobDescription,
+      resume: dto.resume,
+      ragContext: ragContext.promptContext,
+    });
 
     try {
       const result = await this.llm.generateStructured({
-        system: SYSTEM_PROMPT,
+        system: JOB_MATCH_SYSTEM_PROMPT,
         prompt,
         schema: MatchResultSchema,
       });
-      const merged = mergeMockWithRagFields(
-        this.llm.providerName,
-        {
+      return finalizeMatchResult({
+        llm: result,
+        rag: {
           marketSignals: ragContext.marketSignals,
           priorityGaps: ragContext.priorityGaps,
           citations: ragContext.citations,
         },
-        {
-          marketSignals: result.marketSignals,
-          priorityGaps: result.priorityGaps,
-          citations: result.citations,
-        },
-      );
-      return {
-        ...result,
-        marketSignals: merged.marketSignals,
-        priorityGaps: merged.priorityGaps,
-        citations: merged.citations,
-      };
+        jobDescription: dto.jobDescription,
+        resume: dto.resume,
+      });
     } catch (err) {
       this.handleLlmError(err, 'score');
     }

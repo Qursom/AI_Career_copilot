@@ -59,9 +59,13 @@ interface PromptCtx {
 }
 
 function parsePrompt(prompt: string): PromptCtx {
-  // The builder emits `\nTARGET ROLE: …\nTailor EVERY field`. Anything else
-  // named "TARGET ROLE" is resume content and must not become suggestedJobRole
-  // (Zod caps that field at 200 chars; overflowing it fails every retry).
+  const labeledJd = prompt.match(
+    /=== JOB DESCRIPTION ===\s*([\s\S]*?)(?:=== CANDIDATE RESUME ===|$)/,
+  );
+  const labeledResume = prompt.match(
+    /=== CANDIDATE RESUME ===\s*([\s\S]*?)(?:=== EXTERNAL REFERENCE CONTEXT ===|$)/,
+  );
+
   const builderRole = prompt.match(
     /\nTARGET ROLE:\s*(.+)\nTailor EVERY field/,
   );
@@ -79,10 +83,13 @@ function parsePrompt(prompt: string): PromptCtx {
         : -1;
   const resumeSection = resumeEnd >= 0 ? prompt.slice(0, resumeEnd) : prompt;
   const resumeMatch = resumeSection.match(/RESUME:\s*([\s\S]*)/);
-  const resume = (resumeMatch ? resumeMatch[1] : resumeSection).trim();
+  const legacyResume = (resumeMatch ? resumeMatch[1] : resumeSection).trim();
 
   const jdMatch = prompt.match(/JOB DESCRIPTION:\s*([\s\S]*?)(?:\nRESUME:|$)/);
-  const jd = jdMatch ? jdMatch[1].trim() : '';
+  const legacyJd = jdMatch ? jdMatch[1].trim() : '';
+
+  const jd = (labeledJd?.[1] ?? legacyJd).trim();
+  const resume = (labeledResume?.[1] ?? legacyResume).trim();
 
   const hay = `${role}\n${jd}\n${resume}`.toLowerCase();
   return { resume, role, jd, hay };
@@ -885,6 +892,7 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
     (label) => `No mention of ${label} — commonly expected for this role.`,
   );
   const matchSuggestions = improvements.slice(0, 6);
+  const requirements = buildMatchRequirements(ctx);
 
   return {
     fullName: guessName(ctx.resume),
@@ -915,7 +923,36 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
     score: matchScore,
     gaps: dedupe(gaps).slice(0, 8),
     suggestions: dedupe(matchSuggestions).slice(0, 8),
+    requirements,
   };
+}
+
+function buildMatchRequirements(ctx: PromptCtx): Array<{
+  requirement: string;
+  importance: 'required' | 'preferred';
+  status: 'matched' | 'missing';
+  evidence: string;
+}> {
+  const jd = ctx.jd || ctx.role;
+  if (!jd.trim()) return [];
+  const rows: Array<{
+    requirement: string;
+    importance: 'required' | 'preferred';
+    status: 'matched' | 'missing';
+    evidence: string;
+  }> = [];
+  for (const skill of Object.values(SKILL)) {
+    if (!skill.match.test(jd)) continue;
+    const onResume = skill.match.test(ctx.resume);
+    rows.push({
+      requirement: skill.label,
+      importance: 'required',
+      status: onResume ? 'matched' : 'missing',
+      evidence: onResume ? `Resume mentions ${skill.label}` : 'none',
+    });
+    if (rows.length >= 20) break;
+  }
+  return rows;
 }
 
 function guessName(resume: string): string {
