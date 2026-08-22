@@ -10,6 +10,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { JsonLogger } from './common/logging/json.logger';
+import { initSentry } from './common/logging/sentry';
 import { AppModule } from './app.module';
 import { TypedConfigService } from './config/typed-config.service';
 import { LlmService } from './llm/llm.service';
@@ -19,15 +21,21 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    rawBody: true,
   });
 
   const config = app.get(TypedConfigService);
+  await initSentry(config.get('SENTRY_DSN'));
 
-  app.useLogger(
-    ['error', 'warn', 'log', 'debug', 'verbose'].filter(
-      (l) => levelIndex(l) <= levelIndex(config.get('LOG_LEVEL')),
-    ) as ('error' | 'warn' | 'log' | 'debug' | 'verbose')[],
-  );
+  if (config.get('LOG_FORMAT') === 'json' || config.isProd) {
+    app.useLogger(new JsonLogger());
+  } else {
+    app.useLogger(
+      ['error', 'warn', 'log', 'debug', 'verbose'].filter(
+        (l) => levelIndex(l) <= levelIndex(config.get('LOG_LEVEL')),
+      ) as ('error' | 'warn' | 'log' | 'debug' | 'verbose')[],
+    );
+  }
 
   app.set('trust proxy', 1);
   app.set('x-powered-by', false);
@@ -86,7 +94,7 @@ async function bootstrap(): Promise<void> {
 
   if (!config.isProd) {
     const swaggerDoc = new DocumentBuilder()
-      .setTitle('AI Career Copilot API')
+      .setTitle('Smart careerCopilot API')
       .setDescription(
         'Resume analysis, job match scoring, and health endpoints. LLM: mock, gemini, or groq (LangChain ChatGroq). RAG uses Qdrant when QDRANT_URL is set.',
       )
@@ -97,6 +105,7 @@ async function bootstrap(): Promise<void> {
       .addTag('resume')
       .addTag('job-match')
       .addTag('users')
+      .addTag('billing')
       .addTag('health')
       .build();
     const document = SwaggerModule.createDocument(app, swaggerDoc);

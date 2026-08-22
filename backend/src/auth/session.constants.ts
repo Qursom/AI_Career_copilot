@@ -18,6 +18,7 @@ export interface SessionCookieConfig {
   isProd: boolean;
   sameSite: SessionSameSite;
   ttlSeconds: number;
+  domain?: string;
 }
 
 /**
@@ -34,5 +35,6 @@ export function sessionCookieOptions(cfg: SessionCookieConfig): CookieOptions {
     sameSite: cfg.sameSite,
     maxAge: cfg.ttlSeconds * 1000,
     path: '/',
+    ...(cfg.domain ? { domain: cfg.domain } : {}),
   };
 }

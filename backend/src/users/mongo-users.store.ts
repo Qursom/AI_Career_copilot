@@ -93,6 +93,10 @@ export class MongoUsersStore implements UsersStore {
     return this.toRecord(updated);
   }
 
+  creditCoins(firebaseUid: string, amount: number): Promise<UserRecord> {
+    return this.refundCoins(firebaseUid, amount);
+  }
+
   private toRecord(doc: UserDocument): UserRecord {
     return {
       id: String(doc._id),

@@ -181,6 +181,7 @@ body::after {
     opacity: 0.55;
     cursor: not-allowed;
     filter: saturate(0.7);
+    pointer-events: none;
   }
 
   .btn-ghost {

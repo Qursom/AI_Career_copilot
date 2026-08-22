@@ -11,7 +11,11 @@ const PUBLIC_LINKS = [
   { href: "/about", label: "About" },
 ];
 
-const AUTHED_LINKS = [{ href: "/dashboard", label: "Dashboard" }, ...PUBLIC_LINKS];
+const AUTHED_LINKS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/billing", label: "Coins" },
+  ...PUBLIC_LINKS,
+];
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -90,7 +94,7 @@ export default function Navbar() {
             </svg>
           </span>
           <span className="text-white">
-            Career <span className="text-gradient">Copilot</span>
+            Smart <span className="text-gradient">careerCopilot</span>
           </span>
         </Link>
 
@@ -133,7 +137,7 @@ export default function Navbar() {
                     {user.name}
                   </span>
                   <span className="block text-[11px] text-indigo-200/80">
-                    {user.interviewCoins} Coins
+                    {user.interviewCoins} total coins
                   </span>
                 </span>
               </button>
@@ -224,7 +228,7 @@ export default function Navbar() {
                 <span className="min-w-0 leading-tight">
                   <span className="block truncate text-white">{user.name}</span>
                   <span className="block text-[11px] text-indigo-200/80">
-                    {user.interviewCoins} Coins
+                    {user.interviewCoins} total coins
                   </span>
                 </span>
               </div>

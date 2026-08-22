@@ -16,6 +16,12 @@ export class JobMatchEntity {
   @Prop({ required: true, default: '' })
   jobPreview!: string;
 
+  @Prop({ required: false, default: '' })
+  jobDescription!: string;
+
+  @Prop({ required: false, default: '' })
+  resume!: string;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

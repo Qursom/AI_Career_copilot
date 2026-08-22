@@ -28,4 +28,8 @@ export class CacheService {
   del(key: string): Promise<void> {
     return this.store.del(key);
   }
+
+  ping(): Promise<boolean> {
+    return this.store.ping();
+  }
 }

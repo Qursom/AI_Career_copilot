@@ -8,7 +8,7 @@ export default function DashboardPage() {
   return (
     <RequireAuth
       title="Sign in to open your dashboard"
-      description="Your interview coins, resume analysis, and job matches live behind your CareerCopilotAI account."
+      description="Your total coins, resume analysis, and job matches live behind your Smart careerCopilot account."
     >
       <Dashboard />
     </RequireAuth>
@@ -39,7 +39,7 @@ function Dashboard() {
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="card relative overflow-hidden">
           <p className="text-xs font-semibold uppercase tracking-widest text-white/50">
-            Interview Coins
+            Total coins
           </p>
           <p className="mt-3 text-4xl font-semibold text-gradient">
             {user.interviewCoins}
@@ -54,7 +54,11 @@ function Dashboard() {
           </div>
           <p className="mt-3 text-sm text-white/50">
             Each resume analysis costs 10 coins. Failed runs are never charged.
+            Purchases are not available yet — Stripe is not connected.
           </p>
+          <Link href="/billing" className="btn-ghost mt-5 justify-center">
+            View coin packs
+          </Link>
         </div>
 
         <ActionCard
@@ -78,7 +82,7 @@ function Dashboard() {
         <dl className="mt-5 grid gap-4 sm:grid-cols-2">
           <Detail label="Name" value={user.name} />
           <Detail label="Email" value={user.email} />
-          <Detail label="Interview Coins" value={String(user.interviewCoins)} />
+          <Detail label="Total coins" value={String(user.interviewCoins)} />
           <Detail label="Signed in with" value="Google" />
         </dl>
       </div>

@@ -13,3 +13,11 @@ export class JobMatchHistoryItemDto {
   @ApiProperty({ description: 'ISO timestamp of when this pair was scored.' })
   createdAt!: string;
 }
+
+export class JobMatchDetailDto extends JobMatchHistoryItemDto {
+  @ApiProperty()
+  jobDescription!: string;
+
+  @ApiProperty()
+  resume!: string;
+}

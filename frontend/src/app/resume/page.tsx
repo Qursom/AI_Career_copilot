@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import UploadBox from "@/components/UploadBox";
 import ResultCard from "@/components/ResultCard";
 import BulletCard from "@/components/BulletCard";
-import ErrorBanner from "@/components/ErrorBanner";
+import ErrorBanner, { CoinsEmptyCard, isCoinsError } from "@/components/ErrorBanner";
 import RequireAuth from "@/components/RequireAuth";
 import RoleInput from "@/components/RoleInput";
 import {
@@ -26,7 +26,7 @@ export default function ResumePage() {
   return (
     <RequireAuth
       title="Sign in to analyze resumes"
-      description="The Resume Agent caches your score and deducts 10 interview coins per run, so it needs your account."
+      description="The Resume Agent caches your score and deducts 10 coins per run, so it needs your account."
     >
       <ResumeTool />
     </RequireAuth>
@@ -68,6 +68,23 @@ function ResumeTool() {
   }, [user?.id, devUserId]);
 
   const handleAnalyze = async (payload: { text?: string; file?: File }) => {
+    if (!role.trim()) {
+      setState({
+        status: "error",
+        error: new Error("Select a target role before analyzing."),
+      });
+      return;
+    }
+    const text = payload.text?.trim() ?? "";
+    if (!payload.file && text.length < 50) {
+      setState({
+        status: "error",
+        error: new Error(
+          "Upload a PDF or paste your resume before analyzing.",
+        ),
+      });
+      return;
+    }
     setState({ status: "loading", step: "queued", percent: 0 });
     const idempotencyKey =
       typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -87,7 +104,7 @@ function ResumeTool() {
           )
         : await api.analyzeResume(
             {
-              resume: payload.text ?? "",
+              resume: text,
               role: role.trim() || undefined,
             },
             { ...auth, idempotencyKey },
@@ -122,36 +139,69 @@ function ResumeTool() {
   const isLoading = state.status === "loading";
 
   return (
-    <section className="max-w-5xl mx-auto px-6 pt-10 pb-20">
-      <div className="animate-fade-in-up">
+    <section className="max-w-6xl mx-auto px-6 pt-10 pb-20">
+      <div className="animate-fade-in-up relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-600/20 via-violet-600/8 to-cyan-500/10 p-6 sm:p-9">
+        <div
+          className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-indigo-500/20 blur-3xl"
+          aria-hidden="true"
+        />
         <span className="chip glass text-white/70">Resume Agent</span>
-        <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight">
-          ATS score, extract, <span className="text-gradient">and coach</span>.
+        <h1 className="mt-4 max-w-3xl text-4xl sm:text-5xl font-semibold tracking-tight">
+          Make your resume{" "}
+          <span className="text-gradient">impossible to ignore</span>
         </h1>
-        <p className="mt-4 text-white/60 max-w-2xl leading-relaxed">
-          Upload a PDF or paste text. We parse it, score ATS fit, roast the
-          weak lines, and cache the result for your dashboard.
+        <p className="mt-4 max-w-2xl text-white/65 leading-relaxed">
+          Upload a PDF or paste text. Get an ATS score, an honest roast, and a
+          rewrite you can paste into your next application.
         </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {[
+            "ATS score /100",
+            "Honest roast",
+            "Optimized rewrite",
+            "Role-fit gaps",
+          ].map((label) => (
+            <span
+              key={label}
+              className="chip border border-white/10 bg-white/5 text-white/70"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
         {profile && (
-          <p className="mt-3 text-sm text-indigo-200/80">
-            Interview coins: <strong>{profile.interviewCoins}</strong> (each
-            score costs {profile.resumeCoinCost})
+          <p className="mt-5 text-sm text-indigo-100/85">
+            Balance: <strong>{profile.interviewCoins}</strong> coins · this
+            run costs {profile.resumeCoinCost ?? 10} · failed runs are free
           </p>
         )}
       </div>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_1.15fr]">
-        <div className="card p-6 space-y-6">
+      {profile && profile.interviewCoins < (profile.resumeCoinCost ?? 10) && (
+        <div className="mt-6">
+          <CoinsEmptyCard cost={profile.resumeCoinCost ?? 10} />
+        </div>
+      )}
+
+      <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="relative overflow-hidden rounded-3xl border border-indigo-400/20 bg-gradient-to-b from-indigo-500/[0.08] to-transparent p-6 space-y-6">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400" />
+          <p className="text-xs font-semibold uppercase tracking-widest text-indigo-200/80">
+            Step 1 · Target role
+          </p>
           <RoleInput value={role} onChange={setRole} disabled={isLoading} />
 
-          <div className="h-px bg-white/5" />
+          <div className="h-px bg-white/8" />
 
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-white/50 mb-3 flex items-center gap-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              Your resume
-            </h2>
-            <UploadBox onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
+            <p className="text-xs font-semibold uppercase tracking-widest text-cyan-200/80 mb-3">
+              Step 2 · Your resume
+            </p>
+            <UploadBox
+              onAnalyze={handleAnalyze}
+              isAnalyzing={isLoading}
+              hasRole={role.trim().length > 0}
+            />
           </div>
         </div>
 
@@ -160,7 +210,12 @@ function ResumeTool() {
           {state.status === "loading" && (
             <LoadingState step={state.step} percent={state.percent} />
           )}
-          {state.status === "error" && (
+          {state.status === "error" &&
+            !(
+              isCoinsError(state.error) &&
+              profile &&
+              profile.interviewCoins < (profile.resumeCoinCost ?? 10)
+            ) && (
             <ErrorBanner
               error={state.error}
               onDismiss={() => setState({ status: "idle" })}
@@ -360,13 +415,35 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
 }
 
 function EmptyState() {
+  const steps = [
+    { n: "1", title: "Pick a role", body: "Chips or type the job you want." },
+    { n: "2", title: "Add your resume", body: "PDF drop or paste text." },
+    { n: "3", title: "Get the score", body: "ATS, roast, and a rewrite." },
+  ];
   return (
-    <div className="card flex flex-col items-center justify-center text-center py-14">
-      <h3 className="mt-4 font-semibold">Your results will appear here</h3>
-      <p className="mt-1 text-sm text-white/50 max-w-sm">
-        Upload a PDF or paste text, then analyze. Cached scores load instantly
-        on return visits.
+    <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8">
+      <p className="text-xs font-semibold uppercase tracking-widest text-white/40">
+        Results
       </p>
+      <h3 className="mt-2 text-xl font-semibold tracking-tight">
+        Your coaching panel
+      </h3>
+      <p className="mt-2 text-sm text-white/50">
+        Analyze once and we cache the result so you can come back to it.
+      </p>
+      <ol className="mt-8 space-y-4">
+        {steps.map((step) => (
+          <li key={step.n} className="flex gap-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/15 text-sm font-semibold text-indigo-100">
+              {step.n}
+            </span>
+            <div>
+              <p className="text-sm font-medium text-white/85">{step.title}</p>
+              <p className="text-sm text-white/45">{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -406,13 +483,23 @@ function LoadingState({
 
   return (
     <div className="space-y-4">
-      <div className="card p-6">
-        <p className="text-sm text-indigo-200/90 animate-pulse">{message}</p>
-        <p className="mt-2 text-xs text-white/40">
+      <div className="overflow-hidden rounded-3xl border border-indigo-400/25 bg-indigo-500/[0.08] p-6">
+        <p className="text-sm font-medium text-indigo-100 animate-pulse">
+          {message}
+        </p>
+        <p className="mt-2 text-xs text-white/45">
           {typeof percent === "number" && percent > 0
             ? `${percent}% · Failed runs are not charged.`
-            : "This usually takes a few seconds. Failed runs are not charged."}
+            : "Usually a few seconds. Failed runs are not charged."}
         </p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400 transition-all duration-500"
+            style={{
+              width: `${Math.min(100, Math.max(12, percent ?? 18))}%`,
+            }}
+          />
+        </div>
       </div>
       {[0, 1, 2].map((i) => (
         <div key={i} className="card">

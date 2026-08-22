@@ -284,11 +284,12 @@ const BACKEND_NODE: RoleProfile = {
   id: 'backend-node',
   label: 'Node.js Backend Engineer',
   hintPatterns: [
-    /\bback[- ]?end\b[\s\S]{0,40}\bnode/i,
-    /\bnode(?:\.?js)?[\s\S]{0,40}\bback[- ]?end\b/i,
-    /\bnode(?:\.?js)?\s+(developer|engineer)/i,
+    /\bnode(?:\.?js)?\b/i,
     /\bnest\.?js\b/i,
     /\bexpress\s+(developer|engineer)/i,
+    /\bnode(?:\.?js)?\s+(developer|engineer)/i,
+    /\bback[- ]?end\b[\s\S]{0,40}\bnode/i,
+    /\bnode(?:\.?js)?[\s\S]{0,40}\bback[- ]?end\b/i,
   ],
   contentPatterns: [/\b(node\.?js|nestjs|express|fastify)\b/i],
   coreSkills: [
@@ -329,6 +330,49 @@ const BACKEND_NODE: RoleProfile = {
   ],
   atsNotes:
     'For a Node.js backend role, recruiters and ATS parse for: Node.js, TypeScript, NestJS/Express, PostgreSQL, Redis, Kafka, Docker, Kubernetes, AWS, CI/CD, OpenTelemetry. Keep a single-column Skills block, and mention the core stack in at least two bullets, not only in a Skills list.',
+};
+
+const BACKEND_CSHARP: RoleProfile = {
+  id: 'backend-csharp',
+  label: '.NET / C# Engineer',
+  hintPatterns: [
+    /\bc#\b/i,
+    /\bcsharp\b/i,
+    /\.net\b/i,
+    /\bdotnet\b/i,
+    /\basp\.?net\b/i,
+  ],
+  contentPatterns: [/\b(c#|asp\.?net|\.net|entity\s?framework)\b/i],
+  coreSkills: [
+    SKILL.dotnet,
+    SKILL.rest,
+    SKILL.sql,
+    SKILL.redis,
+    SKILL.queue,
+    SKILL.docker,
+    SKILL.k8s,
+    SKILL.aws,
+    SKILL.observability,
+    SKILL.cicd,
+    SKILL.testing,
+    SKILL.security,
+    SKILL.microservices,
+  ],
+  roastHook:
+    'Solid enterprise shape, but I am looking for C# / ASP.NET signals — APIs, EF Core, Azure — not a generic backend template.',
+  improvements: [
+    'Name C#, ASP.NET Core, and EF Core in the Skills block and in two recent bullets.',
+    'Quantify API performance (p95 latency, RPS) on .NET services.',
+    'Show Azure (App Service, Functions, Service Bus) or equivalent cloud work.',
+    'Call out SQL Server / indexing work with before/after numbers.',
+  ],
+  bullets: [
+    '• Built ASP.NET Core APIs in C# (.NET 8) serving 6k RPS at p95 < 80ms on Azure App Service.',
+    '• Cut SQL Server CPU 32% by rewriting EF Core queries and adding covering indexes.',
+    '• Shipped Azure Service Bus consumers with idempotent handlers; 0 poison-message incidents in 8 months.',
+  ],
+  atsNotes:
+    'For a C# / .NET role, ATS looks for C#, ASP.NET Core, EF Core, SQL Server, Azure, and .NET in both Skills and bullets. A Node.js-only résumé should not score in the 90s for this role.',
 };
 
 const BACKEND_GENERIC: RoleProfile = {
@@ -687,6 +731,7 @@ const GENERIC: RoleProfile = {
 
 const PROFILES: RoleProfile[] = [
   BACKEND_NODE,
+  BACKEND_CSHARP,
   BACKEND_GENERIC,
   FRONTEND,
   FULLSTACK,
@@ -793,12 +838,17 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
   //      +5 verbs, +5 if we had a confident role hint.
   const coverage = Math.min(30, present.length * 3);
   const hintConfident = profile.id !== 'generic' && !!ctx.role;
+  const exclusiveMiss =
+    present.filter((s) =>
+      /node|nest|express|c#|\.net|react|python|java/i.test(s.label),
+    ).length === 0 && profile.id !== 'generic';
   const atsScore = clamp(
     50 +
       coverage +
       (hasNumbers ? 5 : 0) +
       (hasVerbs ? 5 : 0) +
-      (hintConfident ? 5 : 0),
+      (hintConfident ? 5 : 0) -
+      (exclusiveMiss ? 22 : 0),
     20,
     98,
   );

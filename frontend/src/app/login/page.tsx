@@ -10,7 +10,7 @@ const AFTER_AUTH = "/dashboard";
 const PERKS = [
   "ATS score + roast + rewrite in one run",
   "Match any job description in seconds",
-  "150 interview coins to start — failed runs are free",
+  "150 coins to start — failed runs are free",
   "Your resume is not used to train models",
 ];
 
@@ -104,7 +104,7 @@ export default function LoginPage() {
             </svg>
           </span>
           <p className="mt-4 text-sm font-semibold tracking-tight text-white/80">
-            Career <span className="text-gradient">Copilot</span>
+            Smart <span className="text-gradient">careerCopilot</span>
           </p>
 
           <h2 className="mt-5 text-3xl font-semibold tracking-tight">

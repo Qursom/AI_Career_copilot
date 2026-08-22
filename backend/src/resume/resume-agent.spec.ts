@@ -96,6 +96,56 @@ describe('ATS + recommendations', () => {
     expect(score).toBeLessThanOrEqual(100);
   });
 
+  it('scores a Node résumé lower for a C# target role than for Node.js', () => {
+    const nodeText = [
+      'Jane Doe',
+      'Node.js NestJS TypeScript PostgreSQL Redis Docker',
+      'Built NestJS APIs. Implemented Express services. npm workspaces.',
+      'x'.repeat(400),
+    ].join('\n');
+    const nodeResume = {
+      ...baseResume,
+      skills: ['Node.js', 'NestJS', 'TypeScript', 'PostgreSQL'],
+    };
+    const forNode = computeDeterministicAtsScore(
+      nodeResume,
+      nodeText,
+      'Node.js Backend Engineer',
+    );
+    const forCsharp = computeDeterministicAtsScore(
+      nodeResume,
+      nodeText,
+      'C# .NET Engineer',
+    );
+    expect(forNode).toBeGreaterThan(forCsharp + 12);
+    expect(forCsharp).toBeLessThan(80);
+  });
+
+  it('scores a C# résumé lower for a Node.js target role than for .NET', () => {
+    const csharpText = [
+      'Alex Smith',
+      'C# ASP.NET Core Entity Framework Azure SQL Server',
+      'Built ASP.NET APIs. EF Core. Dotnet 8.',
+      'x'.repeat(400),
+    ].join('\n');
+    const csharpResume = {
+      ...baseResume,
+      skills: ['C#', 'ASP.NET', 'Entity Framework', 'Azure'],
+    };
+    const forCsharp = computeDeterministicAtsScore(
+      csharpResume,
+      csharpText,
+      '.NET / C# Engineer',
+    );
+    const forNode = computeDeterministicAtsScore(
+      csharpResume,
+      csharpText,
+      'Node.js Backend Engineer',
+    );
+    expect(forCsharp).toBeGreaterThan(forNode + 12);
+    expect(forNode).toBeLessThan(80);
+  });
+
   it('builds recommendations from resume gaps', () => {
     const recs = buildRecommendations({
       ...baseResume,

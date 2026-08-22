@@ -52,6 +52,11 @@ export interface JobMatchHistoryItem {
   createdAt: string;
 }
 
+export interface JobMatchDetail extends JobMatchHistoryItem {
+  jobDescription: string;
+  resume: string;
+}
+
 @Injectable()
 export class JobMatchService {
   private readonly logger = new Logger(JobMatchService.name);
@@ -79,6 +84,13 @@ export class JobMatchService {
 
     const cached = await this.lookupCached(userId, contentHash);
     if (cached) {
+      try {
+        await this.persistPair(userId, contentHash, cached, dto);
+      } catch (err) {
+        this.logger.warn(
+          `job-match persist_inputs_failed userId=${userId} reason=${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       await this.rememberLast(userId, cached);
       const profile = await this.users.getMe(userId);
       this.logger.log(
@@ -108,13 +120,7 @@ export class JobMatchService {
     }
 
     try {
-      await this.matches.upsert({
-        userId,
-        contentHash,
-        result,
-        jobPreview: jobPreview(dto.jobDescription),
-        createdAt: new Date(),
-      });
+      await this.persistPair(userId, contentHash, result, dto);
     } catch (err) {
       this.logger.error(
         `job-match persist_failed userId=${userId} reason=${err instanceof Error ? err.message : String(err)}`,
@@ -156,12 +162,60 @@ export class JobMatchService {
 
   async listHistory(userId: string): Promise<JobMatchHistoryItem[]> {
     const rows = await this.matches.listByUserId(userId, 20);
-    return rows.map((row) => ({
+    return rows.map((row) => this.toHistoryItem(row));
+  }
+
+  async getHistoryItem(
+    userId: string,
+    contentHash: string,
+  ): Promise<JobMatchDetail> {
+    const row = await this.matches.findByUserAndHash(userId, contentHash);
+    if (!row) {
+      throw new NotFoundException({
+        message: 'That match is not in your history.',
+        error: 'NOT_FOUND',
+      });
+    }
+    return {
+      ...this.toHistoryItem(row),
+      jobDescription: row.jobDescription,
+      resume: row.resume,
+    };
+  }
+
+  private toHistoryItem(row: {
+    contentHash: string;
+    result: MatchResult;
+    jobPreview: string;
+    jobDescription?: string;
+    createdAt: Date;
+  }): JobMatchHistoryItem {
+    const source = row.jobDescription?.trim()
+      ? row.jobDescription
+      : row.jobPreview;
+    return {
       contentHash: row.contentHash,
       score: row.result.score,
-      jobPreview: row.jobPreview,
+      jobPreview: jobPreview(source),
       createdAt: row.createdAt.toISOString(),
-    }));
+    };
+  }
+
+  private persistPair(
+    userId: string,
+    contentHash: string,
+    result: MatchResult,
+    dto: ScoreMatchDto,
+  ) {
+    return this.matches.upsert({
+      userId,
+      contentHash,
+      result,
+      jobPreview: jobPreview(dto.jobDescription),
+      jobDescription: dto.jobDescription,
+      resume: dto.resume,
+      createdAt: new Date(),
+    });
   }
 
   private async lookupCached(

@@ -21,6 +21,7 @@ import { JobMatchModule } from './job-match/job-match.module';
 import { HealthModule } from './health/health.module';
 import { RagModule } from './rag/rag.module';
 import { UsersModule } from './users/users.module';
+import { BillingModule } from './billing/billing.module';
 
 const globals: Provider[] = [
   { provide: APP_FILTER, useClass: AllExceptionsFilter },
@@ -52,6 +53,7 @@ const globals: Provider[] = [
     JobMatchModule,
     HealthModule,
     RagModule,
+    BillingModule,
   ],
   providers: globals,
 })

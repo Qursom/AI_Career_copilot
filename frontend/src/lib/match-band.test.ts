@@ -9,5 +9,7 @@ describe("matchBand", () => {
     expect(matchBand(50).label).toBe("Partial match");
     expect(matchBand(49).label).toBe("Weak match");
     expect(matchBand(12).label).toBe("Weak match");
+    expect(matchBand(92).tone).toBe("strong");
+    expect(matchBand(49).tone).toBe("weak");
   });
 });

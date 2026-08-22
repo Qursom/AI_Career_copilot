@@ -1,6 +1,6 @@
-# AI Career Copilot
+# Smart careerCopilot
 
-AI Career Copilot is a full-stack app that helps candidates improve resumes, check fit for specific job descriptions, and manage interview preparation — all behind a secure Google-authenticated session.
+Smart careerCopilot is a full-stack app that helps candidates improve resumes, check fit for specific job descriptions, and manage interview preparation — all behind a secure Google-authenticated session.
 
 **Stack at a glance:** Next.js frontend · NestJS API · LangGraph Resume Agent · Firebase auth · MongoDB · Redis · optional Qdrant RAG · Groq / Gemini / Mock LLM.
 
@@ -17,7 +17,7 @@ From `/resume`, authenticated users paste resume text or upload a PDF (up to 20 
 | `POST /api/v1/resume/upload` | Multipart field `resume` (PDF) |
 | `POST /api/v1/resume/analyze` | JSON `resume` text or multipart field `file` |
 
-Both use the same LangGraph pipeline. Successful analysis costs **10 interview coins** (charged only after MongoDB persistence). Duplicate requests with the same `Idempotency-Key` are not double-charged.
+Both use the same LangGraph pipeline. Successful analysis costs **10 coins** (charged only after MongoDB persistence). Duplicate requests with the same `Idempotency-Key` are not double-charged.
 
 **Returns:** extracted profile, skills, experience, education, projects, roast, strengths/weaknesses, improvements, recommendations, missing skills, suggested role, market signals (RAG), ATS score + notes, remaining coins.
 
@@ -78,7 +78,7 @@ AuthGuard → ResumeController → ResumeAnalysisService
    │              → atsEvaluation → generateRecommendations
    ├─ MongoDB upsert (one resume per userId)
    ├─ Redis cache (failure does not fail the request)
-   ├─ Deduct 10 Interview Coins
+   ├─ Deduct 10 coins
    └─ finally: delete temporary PDF
    ▼
 Next.js dashboard (ATS score, skills, experience, …)
@@ -276,7 +276,7 @@ The backend uses Google DNS (`8.8.8.8`, `1.1.1.1`) for Atlas SRV lookups on Wind
 
 | Collection | Purpose |
 |------------|---------|
-| `users` | Firebase UID (unique), email (indexed), profile, interview coins (default 150) |
+| `users` | Firebase UID (unique), email (indexed), profile, total coins (default 150) |
 | `resumes` | One analysis per user (upserted on each run) |
 | `job_matches` | One row per user + JD/resume hash (history + content-addressed cache) |
 
@@ -478,7 +478,11 @@ Base URL: `http://localhost:3001/api/v1`
 | `POST` | `/job-match/score` | Cookie | Job vs resume match score (coins; cache hit is free) |
 | `GET` | `/job-match/me` | Cookie | Most recent job match for the user |
 | `GET` | `/job-match/history` | Cookie | Recent scored matches for the user |
-| `GET` | `/health` | None | Health check |
+| `GET` | `/health` | None | Liveness |
+| `GET` | `/health/ready` | None | Readiness (Mongo/Redis) |
+| `GET` | `/billing/packs` | None | Coin packs (`enabled: false` without Stripe) |
+| `POST` | `/billing/checkout` | Cookie | Stripe Checkout session |
+| `POST` | `/billing/webhook` | Stripe signature | Credit coins (idempotent) |
 
 All success responses: `{ success: true, data: …, meta: { requestId, timestamp } }`.
 
@@ -525,10 +529,28 @@ All success responses: `{ success: true, data: …, meta: { requestId, timestamp
 
 - Helmet, compression, CORS allowlist, rate limiting, request IDs, global validation (`422` on bad input).
 - Swagger UI disabled in production.
-- Session cookies: `httpOnly`, `sameSite: lax`, `secure` in production.
+- Session cookies: `httpOnly`, `sameSite: lax`, `secure` in production. Optional `SESSION_COOKIE_DOMAIN`.
+- Production boot **fails fast** unless Mongo, Redis, and Firebase Admin are configured. `AUTH_DEV_BYPASS` and `LLM_PROVIDER=mock` are refused (override mock with `ALLOW_MOCK_LLM=true` for staging).
+- Liveness: `GET /api/v1/health`. Readiness: `GET /api/v1/health/ready` (503 if configured Mongo/Redis is down).
+- Optional Sentry: `SENTRY_DSN` (API) and `NEXT_PUBLIC_SENTRY_DSN` (browser).
+- Coin purchases: Stripe Checkout + webhook (`POST /api/v1/billing/webhook`). Credits are idempotent on `checkout.session` id.
 - **Never commit:** `.env`, `.env.local`, `firebase-adminsdk.json`, API keys.
-- **Interview coins:** Deducted server-side only after successful Mongo persistence; idempotency keys prevent double charges.
+- **Coins:** Deducted server-side only after successful Mongo persistence; idempotency keys prevent double charges.
 - **`NEXT_PUBLIC_*`:** Public Firebase client config only; backend verifies all auth.
+
+### Production containers
+
+```bash
+# Point backend/.env at compose service hostnames, not localhost:
+# MONGODB_URI=mongodb://mongo:27017/career_copilot
+# REDIS_URL=redis://redis:6379
+# QDRANT_URL=http://qdrant:6333
+# CORS_ORIGIN=https://your.domain
+# FRONTEND_URL=https://your.domain
+# SESSION_COOKIE_SAMESITE=none   # only if API and UI are on different sites (needs HTTPS)
+
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
 
 ---
 

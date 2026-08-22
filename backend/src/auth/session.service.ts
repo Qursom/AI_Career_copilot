@@ -86,6 +86,7 @@ export class SessionService {
       isProd: this.config.isProd,
       sameSite: this.config.get('SESSION_COOKIE_SAMESITE'),
       ttlSeconds: this.ttlSeconds,
+      domain: this.config.get('SESSION_COOKIE_DOMAIN'),
     });
   }
 

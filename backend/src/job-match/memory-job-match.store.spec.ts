@@ -19,6 +19,8 @@ describe('MemoryJobMatchStore', () => {
       contentHash: 'aaa',
       result: result(40),
       jobPreview: 'old',
+      jobDescription: 'old jd',
+      resume: 'old resume',
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
     };
     const newer = {
@@ -26,6 +28,8 @@ describe('MemoryJobMatchStore', () => {
       contentHash: 'bbb',
       result: result(80),
       jobPreview: 'new',
+      jobDescription: 'new jd',
+      resume: 'new resume',
       createdAt: new Date('2026-08-01T00:00:00.000Z'),
     };
 
@@ -50,6 +54,8 @@ describe('MemoryJobMatchStore', () => {
       contentHash: 'aaa',
       result: result(10),
       jobPreview: 'first',
+      jobDescription: 'jd',
+      resume: 'cv',
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
     });
     await store.upsert({
@@ -57,6 +63,8 @@ describe('MemoryJobMatchStore', () => {
       contentHash: 'aaa',
       result: result(99),
       jobPreview: 'updated',
+      jobDescription: 'jd2',
+      resume: 'cv2',
       createdAt: new Date('2026-08-01T00:00:00.000Z'),
     });
 

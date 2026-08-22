@@ -1,9 +1,23 @@
+import Link from "next/link";
 import { ApiError } from "@/lib/api";
 
 type Props = {
   error: ApiError | Error;
   onDismiss?: () => void;
 };
+
+export function isCoinsError(error: ApiError | Error): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === "INSUFFICIENT_COINS" || error.status === 402)
+  );
+}
+
+function parseCoinShortage(message: string): { cost: number; balance: number } | null {
+  const match = message.match(/Need (\d+) coins;\s*balance is (\d+)/i);
+  if (!match) return null;
+  return { cost: Number(match[1]), balance: Number(match[2]) };
+}
 
 function describe(error: ApiError | Error): {
   title: string;
@@ -44,12 +58,6 @@ function describe(error: ApiError | Error): {
       body: error.message || "Please try again.",
     };
   }
-  if (error.code === "INSUFFICIENT_COINS" || error.status === 402) {
-    return {
-      title: "Not enough interview coins",
-      body: error.message || "You need more interview coins to run this.",
-    };
-  }
   if (
     error.code === "EMPTY_RESUME" ||
     error.code === "PDF_EXTRACTION_FAILED" ||
@@ -75,6 +83,15 @@ function describe(error: ApiError | Error): {
 }
 
 export default function ErrorBanner({ error, onDismiss }: Props) {
+  if (isCoinsError(error)) {
+    return (
+      <CoinsEmptyCard
+        message={error.message}
+        onDismiss={onDismiss}
+      />
+    );
+  }
+
   const { title, body, bullets } = describe(error);
   const requestId = error instanceof ApiError ? error.requestId : null;
 
@@ -128,6 +145,71 @@ export default function ErrorBanner({ error, onDismiss }: Props) {
             Dismiss
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+export function CoinsEmptyCard({
+  message,
+  cost = 10,
+  onDismiss,
+}: {
+  message?: string;
+  cost?: number;
+  onDismiss?: () => void;
+}) {
+  const parsed = message ? parseCoinShortage(message) : null;
+  const balance = parsed?.balance ?? 0;
+  const need = parsed?.cost ?? cost;
+
+  return (
+    <div
+      role="alert"
+      className="relative overflow-hidden rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-orange-500/5 to-transparent p-6"
+    >
+      <div
+        className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-amber-400/10 blur-2xl"
+        aria-hidden="true"
+      />
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-500/15 text-amber-100">
+            <span className="text-2xl font-semibold tabular-nums leading-none">
+              {balance}
+            </span>
+            <span className="mt-0.5 text-[10px] uppercase tracking-widest text-amber-200/70">
+              coins
+            </span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-widest text-amber-200/80">
+              Out of coins
+            </p>
+            <h3 className="mt-1 text-lg font-semibold tracking-tight text-white">
+              This run needs {need} coins
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-white/70">
+              Your balance is {balance}. Analyses and job matches only charge
+              after a successful run. Purchases are not available yet — Stripe
+              is not connected in this MVP.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/billing" className="btn-ghost text-sm">
+                View coin packs
+              </Link>
+            </div>
+          </div>
+        </div>
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="shrink-0 text-xs text-amber-100/60 hover:text-amber-50"
+          >
+            Dismiss
+          </button>
+        ) : null}
       </div>
     </div>
   );

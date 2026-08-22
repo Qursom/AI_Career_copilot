@@ -5,6 +5,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/lib/auth-context";
+import SentryInit from "@/components/SentryInit";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Career Copilot — ATS resume roast, rewrite & job match",
+  title: "Smart careerCopilot — ATS resume roast, rewrite & job match",
   description:
     "The AI workspace for job seekers. Roast weak bullets, rewrite for ATS, score your resume, and match any job description in seconds. Free to start.",
 };
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         suppressHydrationWarning
       >
         <AuthProvider>
+          <SentryInit />
           <Navbar />
           <main className="relative z-10 flex-1 pt-24">{children}</main>
           <Footer />

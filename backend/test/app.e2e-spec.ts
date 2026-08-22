@@ -43,7 +43,7 @@ describe('API (e2e)', () => {
       .expect(200)
       .expect((res) => {
         expect(res.body.success).toBe(true);
-        expect(res.body.data).toEqual({ message: 'AI Career Copilot API' });
+        expect(res.body.data).toEqual({ message: 'Smart careerCopilot API' });
         expect(res.body.meta.requestId).toBeDefined();
       });
   });
@@ -58,6 +58,21 @@ describe('API (e2e)', () => {
         expect(res.body.data.llmProvider).toBe('mock');
         expect(res.body.data.llmProviderEnv).toBe('mock');
         expect(typeof res.body.data.ragEnabled).toBe('boolean');
+      });
+  });
+
+  it('GET /api/v1/health/ready reports dependency checks', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/health/ready')
+      .expect((res) => {
+        expect([200, 503]).toContain(res.status);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.checks).toEqual(
+          expect.objectContaining({
+            mongo: expect.stringMatching(/ok|skipped|down/),
+            redis: expect.stringMatching(/ok|skipped|down/),
+          }),
+        );
       });
   });
 
@@ -238,6 +253,17 @@ describe('API (e2e)', () => {
     expect(Array.isArray(history.body.data)).toBe(true);
     expect(history.body.data.length).toBeGreaterThanOrEqual(1);
     expect(typeof history.body.data[0].score).toBe('number');
+
+    const hash = history.body.data[0].contentHash as string;
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/job-match/history/${hash}`)
+      .set('x-user-id', uid)
+      .expect(200);
+
+    expect(detail.body.data.jobDescription).toContain(
+      payload.jobDescription.slice(0, 40),
+    );
+    expect(detail.body.data.resume).toContain(payload.resume.slice(0, 40));
   });
 
   it('rejects extra fields (forbidNonWhitelisted)', () => {

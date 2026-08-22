@@ -50,6 +50,15 @@ export class RedisCacheStore implements CacheStore, OnModuleDestroy {
     }
   }
 
+  async ping(): Promise<boolean> {
+    try {
+      const pong = await this.client.ping();
+      return pong === 'PONG' || pong === 'pong';
+    } catch {
+      return false;
+    }
+  }
+
   async onModuleDestroy(): Promise<void> {
     this.client.disconnect();
   }

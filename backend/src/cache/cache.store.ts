@@ -4,6 +4,7 @@ export interface CacheStore {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
   del(key: string): Promise<void>;
+  ping(): Promise<boolean>;
 }
 
 export class MemoryCacheStore implements CacheStore {
@@ -27,5 +28,9 @@ export class MemoryCacheStore implements CacheStore {
   del(key: string): Promise<void> {
     this.map.delete(key);
     return Promise.resolve();
+  }
+
+  ping(): Promise<boolean> {
+    return Promise.resolve(true);
   }
 }

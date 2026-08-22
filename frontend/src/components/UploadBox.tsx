@@ -6,15 +6,25 @@ import { extractResumeText } from "@/lib/extractText";
 type UploadBoxProps = {
   onAnalyze?: (payload: { text?: string; file?: File }) => void;
   isAnalyzing?: boolean;
+  /** Analyze stays disabled until a target role is chosen. */
+  hasRole?: boolean;
 };
 
 const MAX_CHARS = 20000;
 const MAX_BYTES = 20 * 1024 * 1024;
+const MIN_CHARS = 50;
+
+function hasResumeInput(pdfFile: File | null, text: string): boolean {
+  const pdfSelected =
+    Boolean(pdfFile) && pdfFile!.name.toLowerCase().endsWith(".pdf");
+  return pdfSelected || text.trim().length >= MIN_CHARS;
+}
 
 
 export default function UploadBox({
   onAnalyze,
   isAnalyzing = false,
+  hasRole = false,
 }: UploadBoxProps) {
   const [text, setText] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -26,10 +36,7 @@ export default function UploadBox({
 
   const remaining = MAX_CHARS - text.length;
   const canAnalyze =
-    ((pdfFile && pdfFile.name.toLowerCase().endsWith(".pdf")) ||
-      text.trim().length > 50) &&
-    !isAnalyzing &&
-    !isExtracting;
+    hasResumeInput(pdfFile, text) && hasRole && !isAnalyzing && !isExtracting;
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -92,10 +99,10 @@ export default function UploadBox({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed transition-all px-6 py-8 text-center ${
+        className={`cursor-pointer rounded-2xl border-2 border-dashed transition-all px-6 py-10 text-center ${
           dragOver
-            ? "border-indigo-400/70 bg-indigo-500/5"
-            : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+            ? "border-indigo-400 bg-indigo-500/10 shadow-[0_0_40px_-12px_rgba(99,102,241,0.7)]"
+            : "border-white/12 bg-gradient-to-b from-white/[0.05] to-transparent hover:border-indigo-400/40 hover:bg-indigo-500/[0.06]"
         }`}
       >
         <input
@@ -105,7 +112,7 @@ export default function UploadBox({
           onChange={onFileChange}
           className="hidden"
         />
-        <div className="mx-auto w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-400/30 bg-gradient-to-br from-indigo-500/30 to-violet-500/20 shadow-[0_0_28px_-8px_rgba(129,140,248,0.9)]">
           {isExtracting ? (
             <svg
               className="w-5 h-5 animate-spin text-indigo-300"
@@ -143,22 +150,22 @@ export default function UploadBox({
             </svg>
           )}
         </div>
-        <p className="mt-3 text-sm text-white/80">
+        <p className="mt-4 text-sm text-white/85">
           {isExtracting ? (
             <>Reading {fileName ?? "file"}…</>
           ) : fileName ? (
             <>
-              Loaded <span className="font-medium">{fileName}</span>
+              Loaded <span className="font-medium text-indigo-100">{fileName}</span>
             </>
           ) : (
             <>
-              <span className="font-medium">Click to upload</span> or drag &
-              drop
+              <span className="font-semibold text-white">Drop your PDF here</span>
+              <span className="text-white/50"> or click to browse</span>
             </>
           )}
         </p>
-        <p className="mt-1 text-xs text-white/40">
-          PDF, TXT, or MD up to 20&nbsp;MB
+        <p className="mt-1.5 text-xs text-white/40">
+          PDF, TXT, or MD · up to 20 MB
         </p>
       </div>
 
@@ -183,21 +190,34 @@ export default function UploadBox({
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <p className="text-xs text-white/40">
           PDFs show a text preview here, then the file is parsed again on the
-          server. Costs 10 interview coins.
+          server. Costs 10 coins.
         </p>
         <button
           type="button"
           disabled={!canAnalyze}
-          onClick={() =>
-            onAnalyze?.(
-              pdfFile
-                ? { file: pdfFile }
-                : { text },
-            )
+          title={
+            canAnalyze
+              ? undefined
+              : !hasRole
+                ? "Select a target role first"
+                : "Upload a PDF or paste at least 50 characters first"
           }
+          onClick={() => {
+            if (!hasRole) {
+              setError("Select a target role before analyzing.");
+              return;
+            }
+            if (!hasResumeInput(pdfFile, text)) {
+              setError(
+                "Upload a PDF or paste your resume before analyzing.",
+              );
+              return;
+            }
+            onAnalyze?.(pdfFile ? { file: pdfFile } : { text: text.trim() });
+          }}
           className="btn-primary"
         >
           {isAnalyzing ? (

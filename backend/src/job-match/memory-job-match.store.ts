@@ -11,6 +11,8 @@ export class MemoryJobMatchStore implements JobMatchStore {
   upsert(record: JobMatchStored): Promise<JobMatchStored> {
     const stored: JobMatchStored = {
       ...record,
+      jobDescription: record.jobDescription ?? '',
+      resume: record.resume ?? '',
       createdAt: record.createdAt ?? new Date(),
     };
     this.byHash.set(this.key(stored.userId, stored.contentHash), stored);

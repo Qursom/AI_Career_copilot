@@ -47,7 +47,7 @@ export class MatchResultDto {
 
   @ApiProperty({
     required: false,
-    description: 'Remaining interview coins after this run.',
+    description: 'Remaining total coins after this run.',
   })
   interviewCoins?: number;
 

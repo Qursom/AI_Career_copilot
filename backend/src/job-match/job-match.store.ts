@@ -7,6 +7,8 @@ export interface JobMatchStored {
   contentHash: string;
   result: MatchResult;
   jobPreview: string;
+  jobDescription: string;
+  resume: string;
   createdAt: Date;
 }
 

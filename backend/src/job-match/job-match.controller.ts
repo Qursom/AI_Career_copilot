@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -18,7 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator';
-import { JobMatchHistoryItemDto } from './dto/job-match-history.dto';
+import { JobMatchDetailDto, JobMatchHistoryItemDto } from './dto/job-match-history.dto';
 import { MatchResultDto } from './dto/match-result.dto';
 import { ScoreMatchDto } from './dto/score-match.dto';
 import { JobMatchService } from './job-match.service';
@@ -46,6 +47,19 @@ export class JobMatchController {
     @CurrentUser() user: AuthUser,
   ): Promise<JobMatchHistoryItemDto[]> {
     return this.service.listHistory(user.userId);
+  }
+
+  @Get('history/:contentHash')
+  @ApiOperation({
+    summary: 'Full job description and resume for one history item.',
+  })
+  @ApiResponse({ status: 200, type: JobMatchDetailDto })
+  @ApiUnauthorizedResponse({ description: 'Missing or expired session.' })
+  getHistoryItem(
+    @CurrentUser() user: AuthUser,
+    @Param('contentHash') contentHash: string,
+  ): Promise<JobMatchDetailDto> {
+    return this.service.getHistoryItem(user.userId, contentHash);
   }
 
   @Post('score')

@@ -66,6 +66,10 @@ export class UsersService {
     );
   }
 
+  creditCoins(firebaseUid: string, amount: number): Promise<UserRecord> {
+    return this.store.creditCoins(firebaseUid, amount);
+  }
+
   /**
    * Soft balance check before expensive work (charge still happens after
    * success). Defaults to the resume analysis cost when `cost` is omitted.

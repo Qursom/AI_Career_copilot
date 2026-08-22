@@ -26,7 +26,7 @@ export default function AboutPage() {
           <span className="text-gradient">not for recruiters.</span>
         </h1>
         <p className="mt-6 text-white/60 text-lg leading-relaxed max-w-2xl">
-          Career Copilot is an AI workspace for job seekers. It roasts the
+          Smart careerCopilot is an AI workspace for job seekers. It roasts the
           parts of your resume that aren&apos;t landing, rewrites them for ATS,
           and tells you — honestly — how well you match a given job.
         </p>
@@ -52,8 +52,9 @@ export default function AboutPage() {
           Have feedback, bug reports, or a story about the resume roast that
           landed you an offer?
         </p>
-        <a href="mailto:hello@example.com" className="btn-primary mt-6">
+        <a href="mailto:wandertech58@gmail.com" className="btn-primary mt-6">
           Say hi
+          <span className="font-normal opacity-80">wandertech58@gmail.com</span>
           <svg
             viewBox="0 0 24 24"
             fill="none"

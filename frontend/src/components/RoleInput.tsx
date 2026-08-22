@@ -4,6 +4,8 @@ const SUGGESTIONS = [
   "Senior Frontend Engineer",
   "Full-Stack Engineer",
   "Backend Engineer",
+  "Node.js Backend Engineer",
+  ".NET / C# Engineer",
   "Engineering Manager",
   "Product Designer",
   "Data Engineer",
@@ -35,7 +37,7 @@ export default function RoleInput({ value, onChange, disabled }: Props) {
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-400" />
           Target role
           <span className="normal-case tracking-normal text-[11px] font-normal text-white/30">
-            optional — sharpens missing skills & ATS score
+            required — pick a chip or type a role
           </span>
         </label>
         {hasValue && (

@@ -146,6 +146,7 @@ export class ResumeAnalysisService {
     const payload = { ...args, requestId };
 
     await this.users.ensureUser(args.userId, args.email);
+    this.assertResumeProvided(args);
 
     const idemKey = this.idempotencyKey(args.userId, requestId);
     const prior = await this.safeCacheGet(idemKey);
@@ -204,6 +205,7 @@ export class ResumeAnalysisService {
     const started = Date.now();
 
     await this.users.ensureUser(args.userId, args.email);
+    this.assertResumeProvided(args);
 
     const idemKey = this.idempotencyKey(args.userId, requestId);
     const prior = await this.safeCacheGet(idemKey);
@@ -370,6 +372,18 @@ export class ResumeAnalysisService {
         `resume_charge_refund_failed userId=${userId} requestId=${requestId} reason=${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  private assertResumeProvided(args: {
+    filePath?: string;
+    rawText?: string;
+  }): void {
+    if (args.filePath) return;
+    if ((args.rawText?.trim().length ?? 0) >= 50) return;
+    throw new BadRequestException({
+      message: 'Upload a PDF or paste at least 50 characters of resume text.',
+      error: 'EMPTY_RESUME',
+    });
   }
 
   private throwGraphError(code?: string): never {

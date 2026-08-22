@@ -21,6 +21,8 @@ export class MongoJobMatchStore implements JobMatchStore {
         $set: {
           result: record.result,
           jobPreview: record.jobPreview,
+          jobDescription: record.jobDescription,
+          resume: record.resume,
         },
         $setOnInsert: {
           userId: record.userId,
@@ -53,8 +55,9 @@ export class MongoJobMatchStore implements JobMatchStore {
       .find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
+      .lean()
       .exec();
-    return docs.map((doc) => this.toStored(doc));
+    return docs.map((doc) => this.toStored(doc as JobMatchDocument));
   }
 
   private toStored(doc: JobMatchDocument): JobMatchStored {
@@ -63,6 +66,8 @@ export class MongoJobMatchStore implements JobMatchStore {
       contentHash: doc.contentHash,
       result: doc.result,
       jobPreview: doc.jobPreview,
+      jobDescription: doc.jobDescription ?? '',
+      resume: doc.resume ?? '',
       createdAt: doc.createdAt ?? new Date(),
     };
   }

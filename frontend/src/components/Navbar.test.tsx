@@ -71,7 +71,7 @@ describe("Navbar", () => {
     render(<Navbar />);
 
     expect(screen.getAllByText("Qursom").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("150 Coins").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("150 total coins").length).toBeGreaterThan(0);
   });
 
   it("opens a menu with Dashboard and Logout", async () => {

@@ -106,7 +106,7 @@ export class ResumeController {
   @ApiOperation({
     summary: 'Upload a PDF resume for LangGraph analysis',
     description:
-      'Multipart field "resume" (PDF, max RESUME_MAX_FILE_SIZE_MB — 20 MB by default). Inline analysis returns 200. When RESUME_QUEUE_ENABLED=true this returns 202 + jobId; poll GET /resume/status/:jobId. Costs 10 interview coins after success.',
+      'Multipart field "resume" (PDF, max RESUME_MAX_FILE_SIZE_MB — 20 MB by default). Inline analysis returns 200. When RESUME_QUEUE_ENABLED=true this returns 202 + jobId; poll GET /resume/status/:jobId. Costs 10 coins after success.',
   })
   @ApiResponse({ status: 200, type: ResumeAnalysisDto })
   @ApiAcceptedResponse({ type: ResumeJobAcceptedDto })
@@ -138,7 +138,7 @@ export class ResumeController {
   @ApiOperation({
     summary: 'Analyze a resume',
     description:
-      'JSON body with resume text, or multipart PDF field "file". Same pipeline as /upload. Inline analysis returns 200. When RESUME_QUEUE_ENABLED=true this returns 202 + jobId; poll GET /resume/status/:jobId. Costs 10 interview coins after success.',
+      'JSON body with resume text, or multipart PDF field "file". Same pipeline as /upload. Inline analysis returns 200. When RESUME_QUEUE_ENABLED=true this returns 202 + jobId; poll GET /resume/status/:jobId. Costs 10 coins after success.',
   })
   @ApiResponse({ status: 200, type: ResumeAnalysisDto })
   @ApiAcceptedResponse({ type: ResumeJobAcceptedDto })

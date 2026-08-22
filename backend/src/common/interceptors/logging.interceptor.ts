@@ -32,6 +32,21 @@ export class LoggingInterceptor implements NestInterceptor {
   private log(req: Request, res: Response, start: bigint): void {
     const ms = Number(process.hrtime.bigint() - start) / 1_000_000;
     const line = `${req.method} ${req.originalUrl} ${res.statusCode} ${ms.toFixed(1)}ms rid=${req.requestId ?? '-'}`;
+    if (process.env.LOG_FORMAT === 'json' || process.env.NODE_ENV === 'production') {
+      const payload = JSON.stringify({
+        ts: new Date().toISOString(),
+        type: 'http',
+        method: req.method,
+        path: req.originalUrl,
+        status: res.statusCode,
+        ms: Number(ms.toFixed(1)),
+        requestId: req.requestId ?? '-',
+      });
+      if (res.statusCode >= 500) this.logger.error(payload);
+      else if (res.statusCode >= 400) this.logger.warn(payload);
+      else this.logger.log(payload);
+      return;
+    }
     if (res.statusCode >= 500) this.logger.error(line);
     else if (res.statusCode >= 400) this.logger.warn(line);
     else this.logger.log(line);

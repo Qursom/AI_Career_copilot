@@ -15,8 +15,8 @@ export class AnalyzeResumeDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @Length(0, 20_000, {
-    message: 'resume must be at most 20,000 characters.',
+  @Length(50, 20_000, {
+    message: 'resume must be between 50 and 20,000 characters.',
   })
   resume?: string;
 

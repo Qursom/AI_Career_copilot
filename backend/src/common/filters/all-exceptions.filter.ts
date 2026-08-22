@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { captureException } from '../logging/sentry';
 import { TypedConfigService } from '../../config/typed-config.service';
 
 export interface ApiErrorBody {
@@ -65,6 +66,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         logLine,
         exception instanceof Error ? exception.stack : undefined,
       );
+      void captureException(exception);
     } else {
       this.logger.warn(logLine);
     }

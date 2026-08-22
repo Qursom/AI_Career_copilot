@@ -52,7 +52,7 @@ const STEPS = [
 const STATS = [
   { value: "2,400+", label: "resumes roasted this week" },
   { value: "30s", label: "typical first analysis" },
-  { value: "150", label: "free interview coins to start" },
+  { value: "150", label: "free coins to start" },
   { value: "0", label: "charge if a run fails" },
 ];
 
@@ -91,7 +91,7 @@ const QUOTES = [
 const FAQS = [
   {
     q: "Is it free to try?",
-    a: "Yes. New accounts start with interview coins. Each successful resume analysis costs 10 coins. Failed runs are never charged.",
+    a: "Yes. New accounts start with coins. Each successful resume analysis costs 10 coins. Failed runs are never charged.",
   },
   {
     q: "Do you train on my resume?",
@@ -118,7 +118,7 @@ export default function Home() {
             </span>
 
             <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
-              The career copilot that
+              The Smart careerCopilot that
               <span className="text-gradient"> gets you past ATS</span>
               {" "}and into the interview.
             </h1>
@@ -306,7 +306,7 @@ export default function Home() {
               Your next role is one honest resume away.
             </h2>
             <p className="mt-4 text-white/60 max-w-xl mx-auto">
-              150 interview coins on signup. No credit card. Roast, rewrite, and
+              150 coins on signup. No credit card. Roast, rewrite, and
               match in the same workspace.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

@@ -1,5 +1,5 @@
 /**
- * Typed client for the AI Career Copilot backend.
+ * Typed client for the Smart careerCopilot backend.
  *
  * The backend always returns one of two envelopes:
  *
@@ -118,6 +118,11 @@ export interface JobMatchHistoryItem {
   score: number;
   jobPreview: string;
   createdAt: string;
+}
+
+export interface JobMatchDetail extends JobMatchHistoryItem {
+  jobDescription: string;
+  resume: string;
 }
 
 export interface ScoreMatchInput {
@@ -462,4 +467,29 @@ export const api = {
 
   getMyJobMatchHistory: (auth?: AuthHeaders) =>
     request<JobMatchHistoryItem[]>("/job-match/history", undefined, auth),
+
+  getJobMatchDetail: (contentHash: string, auth?: AuthHeaders) =>
+    request<JobMatchDetail>(
+      `/job-match/history/${encodeURIComponent(contentHash)}`,
+      undefined,
+      auth,
+    ),
+
+  getCoinPacks: () =>
+    request<{ enabled: boolean; packs: CoinPack[] }>("/billing/packs"),
+
+  createCoinCheckout: (packId: string) =>
+    request<{ url: string }>("/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ packId }),
+    }),
 };
+
+export interface CoinPack {
+  id: string;
+  stripePriceId: string;
+  coins: number;
+  name?: string;
+  description?: string;
+  popular?: boolean;
+}

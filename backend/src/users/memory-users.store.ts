@@ -67,4 +67,8 @@ export class MemoryUsersStore implements UsersStore {
     row.interviewCoins += amount;
     return Promise.resolve({ ...row });
   }
+
+  creditCoins(firebaseUid: string, amount: number): Promise<UserRecord> {
+    return this.refundCoins(firebaseUid, amount);
+  }
 }

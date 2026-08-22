@@ -2,7 +2,7 @@
   "name": "ai-career-copilot",
   "version": "0.1.0",
   "private": true,
-  "description": "AI Career Copilot - Next.js frontend + NestJS backend monorepo",
+  "description": "Smart careerCopilot - Next.js frontend + NestJS backend monorepo",
   "scripts": {
     "install:all": "npm install && npm --prefix frontend install && npm --prefix backend install",
     "dev": "concurrently -n backend,frontend -c blue,magenta \"npm --prefix backend run start:dev\" \"npm --prefix frontend run dev\"",

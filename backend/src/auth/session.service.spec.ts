@@ -35,7 +35,9 @@ function build(overrides?: { isProd?: boolean; sameSite?: string }) {
         ? TTL
         : key === 'SESSION_COOKIE_SAMESITE'
           ? (overrides?.sameSite ?? 'lax')
-          : undefined,
+          : key === 'SESSION_COOKIE_DOMAIN'
+            ? undefined
+            : undefined,
   };
   const service = new SessionService(
     cache as unknown as CacheService,

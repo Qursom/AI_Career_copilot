@@ -31,6 +31,8 @@ export interface UsersStore {
   chargeCoins(firebaseUid: string, cost: number): Promise<UserRecord>;
   /** Compensates a charge whose work could not be completed. */
   refundCoins(firebaseUid: string, amount: number): Promise<UserRecord>;
+  /** Credits purchased coins (Stripe webhook). */
+  creditCoins(firebaseUid: string, amount: number): Promise<UserRecord>;
 }
 
 export class InsufficientCoinsError extends Error {
@@ -39,6 +41,6 @@ export class InsufficientCoinsError extends Error {
     public readonly balance: number,
     public readonly cost: number,
   ) {
-    super(`Need ${cost} interview coins; balance is ${balance}.`);
+    super(`Need ${cost} coins; balance is ${balance}.`);
   }
 }

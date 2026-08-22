@@ -176,7 +176,7 @@ describe('JobMatchService', () => {
     });
     expect(generateStructured).not.toHaveBeenCalled();
     expect(users.chargeJobMatch).not.toHaveBeenCalled();
-    expect(store.upsert).not.toHaveBeenCalled();
+    expect(store.upsert).toHaveBeenCalled();
   });
 
   it('treats a store hit as a cache hit when Redis is empty', async () => {
@@ -185,6 +185,8 @@ describe('JobMatchService', () => {
       contentHash: 'abc',
       result: fakeMatch,
       jobPreview: 'Senior Frontend',
+      jobDescription: '',
+      resume: '',
       createdAt: new Date(),
     });
     const generateStructured = jest.fn();
@@ -303,6 +305,9 @@ describe('JobMatchService', () => {
         contentHash: 'h1',
         result: { ...fakeMatch, score: 90 },
         jobPreview: 'Senior Frontend',
+        jobDescription:
+          'About the job\n\nJob title: Senior Frontend Engineer\n\nBuild UI.',
+        resume: 'cv',
         createdAt: new Date('2026-08-20T12:00:00.000Z'),
       },
     ]);
@@ -311,7 +316,7 @@ describe('JobMatchService', () => {
       {
         contentHash: 'h1',
         score: 90,
-        jobPreview: 'Senior Frontend',
+        jobPreview: 'Senior Frontend Engineer',
         createdAt: '2026-08-20T12:00:00.000Z',
       },
     ]);

@@ -14,6 +14,7 @@
     "postinstall": "npm run copy-pdf-worker"
   },
   "dependencies": {
+    "@sentry/browser": "^10.70.0",
     "firebase": "^12.17.1",
     "next": "16.2.4",
     "pdfjs-dist": "^4.10.38",

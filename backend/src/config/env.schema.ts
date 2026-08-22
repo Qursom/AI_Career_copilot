@@ -97,6 +97,35 @@ export const EnvSchema = z.object({
    * secure cookie, so it needs HTTPS).
    */
   SESSION_COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  /** Optional cookie Domain. Leave empty so the host that set it is used. */
+  SESSION_COOKIE_DOMAIN: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+
+  /**
+   * Public site origin used for Stripe return URLs. Also a reminder of which
+   * origin belongs in CORS_ORIGIN.
+   */
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
+
+  /**
+   * Production refuses LLM_PROVIDER=mock unless this is true. Staging can set
+   * it to keep Groq/Gemini spend at zero.
+   */
+  ALLOW_MOCK_LLM: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+
+  LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
+
+  SENTRY_DSN: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+
+  STRIPE_SECRET_KEY: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+  STRIPE_WEBHOOK_SECRET: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+  /**
+   * Coin packs: `id:priceId:coins,...`
+   * Example: `starter:price_abc:50,plus:price_def:200`
+   */
+  STRIPE_COIN_PACKS: z.preprocess(emptyToUndef, z.string().min(1).optional()),
 
   /**
    * Opt-in for the local `x-user-id` identity header, which authenticates as
