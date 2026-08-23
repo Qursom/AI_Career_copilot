@@ -118,7 +118,7 @@ export default function Home() {
             </span>
 
             <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
-              The Smart careerCopilot that
+              The AI Career copilot that
               <span className="text-gradient"> gets you past ATS</span>
               {" "}and into the interview.
             </h1>

@@ -9,7 +9,7 @@ export default function BillingPage() {
   return (
     <RequireAuth
       title="Sign in to buy coins"
-      description="Purchases are tied to your Smart careerCopilot account."
+      description="Purchases are tied to your AI Career copilot account."
     >
       <BuyCoins />
     </RequireAuth>

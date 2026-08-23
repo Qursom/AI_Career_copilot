@@ -8,7 +8,7 @@ export default function DashboardPage() {
   return (
     <RequireAuth
       title="Sign in to open your dashboard"
-      description="Your total coins, resume analysis, and job matches live behind your Smart careerCopilot account."
+      description="Your total coins, resume analysis, and job matches live behind your AI Career copilot account."
     >
       <Dashboard />
     </RequireAuth>

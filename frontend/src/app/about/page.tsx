@@ -26,7 +26,7 @@ export default function AboutPage() {
           <span className="text-gradient">not for recruiters.</span>
         </h1>
         <p className="mt-6 text-white/60 text-lg leading-relaxed max-w-2xl">
-          Smart careerCopilot is an AI workspace for job seekers. It roasts the
+          AI Career copilot is a workspace for job seekers. It roasts the
           parts of your resume that aren&apos;t landing, rewrites them for ATS,
           and tells you — honestly — how well you match a given job.
         </p>

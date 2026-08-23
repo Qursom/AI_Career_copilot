@@ -1,5 +1,5 @@
 /**
- * Typed client for the Smart careerCopilot backend.
+ * Typed client for the AI Career copilot backend.
  *
  * The backend always returns one of two envelopes:
  *
