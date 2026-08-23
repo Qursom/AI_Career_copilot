@@ -1,26 +1,24 @@
 # syntax=docker/dockerfile:1
-FROM node:22-alpine AS deps
+# NestJS API image for local compose and Render (Docker runtime).
+# Node 22 matches CI (.github/workflows/ci.yml). Secrets come from runtime env only.
+
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-
-FROM deps AS build
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS prod-deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
-FROM node:22-alpine
+FROM node:22-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY package.json ./
+# Local default. Render injects PORT (often 10000) — Nest reads it via EnvSchema.
+ENV PORT=3001
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=builder /app/dist ./dist
 USER node
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3001/api/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
+  CMD node -e "const p=process.env.PORT||3001;fetch('http://127.0.0.1:'+p+'/api/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]

@@ -4,6 +4,7 @@ import { getConnectionToken } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
 import { CacheService } from '../cache/cache.service';
 import { isMongoConfigured } from '../config/mongo-enabled';
+import { hasUpstashRest } from '../config/redis-url';
 import { TypedConfigService } from '../config/typed-config.service';
 import { LlmService } from '../llm/llm.service';
 
@@ -84,7 +85,11 @@ export class HealthService {
   }
 
   private async redisStatus(): Promise<DepStatus> {
-    if (!this.config.get('REDIS_URL')) return 'skipped';
+    const rest = hasUpstashRest({
+      UPSTASH_REDIS_REST_URL: this.config.get('UPSTASH_REDIS_REST_URL'),
+      UPSTASH_REDIS_REST_TOKEN: this.config.get('UPSTASH_REDIS_REST_TOKEN'),
+    });
+    if (!this.config.get('REDIS_URL') && !rest) return 'skipped';
     return (await this.cache.ping()) ? 'ok' : 'down';
   }
 }

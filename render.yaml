@@ -1,0 +1,77 @@
+# Render Blueprint — Docker deploys (API + static Next in nginx).
+# Dashboard: New → Blueprint → this repo.
+# Fill sync:false env vars, then trigger a frontend rebuild after NEXT_PUBLIC_* are set.
+#
+# Data you still host yourself: MongoDB Atlas, Qdrant Cloud (optional), Firebase.
+
+services:
+  - type: web
+    name: career-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_FORMAT
+        value: json
+      - key: SESSION_COOKIE_SAMESITE
+        value: none
+      - key: RAG_ENABLED
+        value: false
+      - key: RESUME_QUEUE_ENABLED
+        value: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: LLM_PROVIDER
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_URL
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+
+  - type: web
+    name: career-web
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_APP_ID
+        sync: false
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false

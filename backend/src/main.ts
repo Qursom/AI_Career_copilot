@@ -118,7 +118,7 @@ async function bootstrap(): Promise<void> {
   }
 
   const port = config.get('PORT');
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   const llm = app.get(LlmService);
   const llmEnv = config.get('LLM_PROVIDER');

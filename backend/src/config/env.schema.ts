@@ -67,6 +67,11 @@ export const EnvSchema = z.object({
 
   MONGODB_URI: z.preprocess(emptyToUndef, z.string().min(1).optional()),
   REDIS_URL: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+  UPSTASH_REDIS_REST_URL: z.preprocess(emptyToUndef, z.string().min(1).optional()),
+  UPSTASH_REDIS_REST_TOKEN: z.preprocess(
+    emptyToUndef,
+    z.string().min(1).optional(),
+  ),
   REDIS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
   /**
    * Opt-in BullMQ for resume analysis. Default false: analyze/upload run

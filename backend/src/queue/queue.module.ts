@@ -27,7 +27,9 @@ import { ResumeJobClient } from './resume-job.client';
             url,
             maxRetriesPerRequest: null,
             enableOfflineQueue: false,
-            connectTimeout: 2_000,
+            connectTimeout: 10_000,
+            family: 0,
+            tls: url?.startsWith('rediss://') ? {} : undefined,
           },
         };
       },

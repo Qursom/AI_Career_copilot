@@ -11,6 +11,9 @@ export class RedisCacheStore implements CacheStore, OnModuleDestroy {
     this.client = new Redis(url, {
       maxRetriesPerRequest: 2,
       lazyConnect: true,
+      connectTimeout: 10_000,
+      family: 0,
+      tls: url.startsWith('rediss://') ? {} : undefined,
     });
     this.client.on('error', (err) => {
       this.logger.warn(`Redis error: ${err.message}`);

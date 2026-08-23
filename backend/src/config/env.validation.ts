@@ -1,11 +1,18 @@
 import { EnvSchema, type Env } from './env.schema';
+import { hasUpstashRest, resolveRedisUrl } from './redis-url';
 
 /**
  * Used by `@nestjs/config`'s `validate` option. Runs once at boot.
  * Throws with a human-readable message if env is invalid.
  */
 export function validateEnv(raw: Record<string, unknown>): Env {
-  const parsed = EnvSchema.safeParse(raw);
+  const merged: Record<string, unknown> = { ...raw };
+  const redisUrl = resolveRedisUrl(merged);
+  if (redisUrl) {
+    merged.REDIS_URL = redisUrl;
+  }
+
+  const parsed = EnvSchema.safeParse(merged);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  • ${i.path.join('.') || '(root)'}: ${i.message}`)
@@ -48,7 +55,9 @@ function hasFirebaseAdmin(env: Env): boolean {
 function assertProductionReady(env: Env): void {
   const missing: string[] = [];
   if (!env.MONGODB_URI) missing.push('MONGODB_URI');
-  if (!env.REDIS_URL) missing.push('REDIS_URL');
+  if (!env.REDIS_URL && !hasUpstashRest(env)) {
+    missing.push('UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN');
+  }
   if (!hasFirebaseAdmin(env)) {
     missing.push(
       'Firebase Admin (FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY)',

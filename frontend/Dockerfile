@@ -19,6 +19,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
 RUN npm run build
 
 FROM nginx:1.27-alpine
+ENV PORT=80
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/out /usr/share/nginx/html
 EXPOSE 80
+# Render sets PORT (often 10000). Local compose leaves PORT=80.
+CMD ["/bin/sh", "-c", "sed -i \"s/listen 80;/listen ${PORT};/\" /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
