@@ -14,6 +14,7 @@ import { JsonLogger } from './common/logging/json.logger';
 import { initSentry } from './common/logging/sentry';
 import { AppModule } from './app.module';
 import { TypedConfigService } from './config/typed-config.service';
+import { HealthService } from './health/health.service';
 import { LlmService } from './llm/llm.service';
 
 async function bootstrap(): Promise<void> {
@@ -117,6 +118,8 @@ async function bootstrap(): Promise<void> {
     );
   }
 
+  registerPublicProbes(app);
+
   const port = config.get('PORT');
   await app.listen(port, '0.0.0.0');
 
@@ -125,6 +128,23 @@ async function bootstrap(): Promise<void> {
   logger.log(
     `🚀 ${config.get('NODE_ENV')} API ready at http://localhost:${port}/${config.get('API_PREFIX')}/v1 (llm=${llm.providerName}, LLM_PROVIDER=${llmEnv})`,
   );
+}
+
+function registerPublicProbes(app: NestExpressApplication): void {
+  const health = app.get(HealthService);
+  const http = app.getHttpAdapter();
+  http.get('/', (_req, res) => {
+    res.status(200).json({
+      message: 'Smart careerCopilot API',
+      health: '/api/v1/health',
+    });
+  });
+  http.get('/health', (_req, res) => {
+    res.status(200).json(health.check());
+  });
+  http.get('/favicon.ico', (_req, res) => {
+    res.status(204).end();
+  });
 }
 
 function levelIndex(level: string): number {

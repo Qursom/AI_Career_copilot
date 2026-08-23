@@ -11,8 +11,11 @@ out/
 .env.local
 .env.*
 !.env.example
+!.env.production.example
 !backend/.env.example
+!backend/.env.production.example
 !frontend/.env.example
+!frontend/.env.production.example
 
 # Logs
 *.log

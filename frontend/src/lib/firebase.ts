@@ -126,7 +126,10 @@ export function firebaseAuthMessage(
     return "Email or password is wrong, or this account does not exist yet. Click “Need an account? Register” first, then Sign in.";
   }
   if (has("unauthorized-domain")) {
-    return "Add localhost to Authentication → Settings → Authorized domains.";
+    const host =
+      typeof window !== "undefined" ? window.location.hostname : "";
+    const domainHint = host && host !== "localhost" ? host : "localhost";
+    return `This site is not allowed to use Firebase Auth. In Firebase Console → Authentication → Settings → Authorized domains, add “${domainHint}” (and keep localhost for local dev). Then wait a minute and try again.`;
   }
   return message;
 }

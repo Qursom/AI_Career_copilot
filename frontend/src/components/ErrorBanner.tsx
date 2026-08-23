@@ -73,7 +73,7 @@ function describe(error: ApiError | Error): {
   if (error.status === 0) {
     return {
       title: "Can't reach the backend",
-      body: "Is the NestJS API running on http://localhost:3001? Start it with `npm run start:dev` from the backend folder.",
+      body: error.message,
     };
   }
   return {

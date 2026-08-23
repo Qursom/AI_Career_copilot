@@ -13,6 +13,34 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
+function apiUnreachableMessage(cause?: string): string {
+  const isLocalApi = /localhost|127\.0\.0\.1/.test(API_BASE_URL);
+  const onVercel =
+    typeof window !== "undefined" &&
+    !["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+  if (isLocalApi && onVercel) {
+    return (
+      `This Vercel build still points at ${API_BASE_URL}. ` +
+      `In Vercel → Project → Settings → Environment Variables, set ` +
+      `NEXT_PUBLIC_API_URL to https://YOUR-RENDER-SERVICE.onrender.com/api/v1 ` +
+      `(Production), then Redeploy. NEXT_PUBLIC_* is baked in at build time.`
+    );
+  }
+  if (isLocalApi) {
+    return (
+      `Cannot reach the API at ${API_BASE_URL}` +
+      (cause ? ` (${cause})` : "") +
+      `. Start the backend with npm --prefix backend run start:dev.`
+    );
+  }
+  return (
+    `Cannot reach the API at ${API_BASE_URL}` +
+    (cause ? ` (${cause})` : "") +
+    `. On Render, confirm the service is live and CORS_ORIGIN is this site’s origin.`
+  );
+}
+
 // ---------- Envelope types ----------
 
 interface ApiSuccessEnvelope<T> {
@@ -265,10 +293,9 @@ async function request<T>(
     throw new ApiError({
       status: 0,
       code: "NETWORK",
-      message:
-        err instanceof Error
-          ? `Cannot reach the API at ${API_BASE_URL} (${err.message}). Start the backend with npm run dev or npm --prefix backend run start:dev.`
-          : `Cannot reach the API at ${API_BASE_URL}. Start the backend with npm run dev.`,
+      message: apiUnreachableMessage(
+        err instanceof Error ? err.message : undefined,
+      ),
       requestId: "offline",
     });
   }
