@@ -4,7 +4,11 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 import type { TypedConfigService } from '../../config/typed-config.service';
 
 function host(args?: { type?: string }) {
-  const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+    end: jest.fn().mockReturnThis(),
+  };
   const req = {
     requestId: 'rid-1',
     originalUrl: '/api/v1/resume/upload',
