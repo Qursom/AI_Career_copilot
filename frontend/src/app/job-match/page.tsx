@@ -21,7 +21,7 @@ export default function JobMatchPage() {
   return (
     <RequireAuth
       title="Sign in to match jobs"
-      description="Job matches are scored against your AI Career copilot account so you can pick them back up later."
+      description="Job matches are scored against your AICareerCopilot account so you can pick them back up later."
     >
       <JobMatchTool />
     </RequireAuth>

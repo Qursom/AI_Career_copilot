@@ -100,7 +100,7 @@ async function bootstrap(): Promise<void> {
 
   if (!config.isProd) {
     const swaggerDoc = new DocumentBuilder()
-      .setTitle('Smart careerCopilot API')
+      .setTitle('AICareerCopilot API')
       .setDescription(
         'Resume analysis, job match scoring, and health endpoints. LLM: mock, gemini, or groq (LangChain ChatGroq). RAG uses Qdrant when QDRANT_URL is set.',
       )
@@ -140,7 +140,7 @@ function registerPublicProbes(app: NestExpressApplication): void {
   const http = app.getHttpAdapter();
   http.get('/', (_req: Request, res: Response) => {
     res.status(200).json({
-      message: 'Smart careerCopilot API',
+      message: 'AICareerCopilot API',
       health: '/api/v1/health',
     });
   });

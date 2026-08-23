@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth-context";
 export default function RequireAuth({
   children,
   title = "Sign in to continue",
-  description = "AI Career copilot keeps your analyses and coins tied to your account.",
+  description = "AICareerCopilot keeps your analyses and coins tied to your account.",
 }: {
   children: ReactNode;
   title?: string;

@@ -122,7 +122,7 @@ export default function LoginPage() {
             </svg>
           </span>
           <p className="mt-4 text-sm font-semibold tracking-tight text-white/80">
-            AI <span className="text-gradient">Career copilot</span>
+            AICareer<span className="text-gradient">Copilot</span>
           </p>
 
           <h2 className="mt-5 text-3xl font-semibold tracking-tight">

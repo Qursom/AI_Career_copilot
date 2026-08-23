@@ -25,7 +25,7 @@ export default function ContactForm() {
     e.preventDefault();
     const topicLabel =
       TOPICS.find((t) => t.value === topic)?.label ?? "Product support";
-    const subject = encodeURIComponent(`[AI Career copilot] ${topicLabel}`);
+    const subject = encodeURIComponent(`[AICareerCopilot] ${topicLabel}`);
     const body = encodeURIComponent(
       `Name: ${name}\nEmail: ${email}\nTopic: ${topicLabel}\n\n${message}`,
     );

@@ -42,7 +42,7 @@ export default function Footer() {
                   </svg>
                 </span>
                 <span className="text-base">
-                  AI <span className="text-gradient">Career copilot</span>
+                  AICareer<span className="text-gradient">Copilot</span>
                 </span>
               </Link>
               <p className="max-w-sm text-sm leading-relaxed text-white/50">
@@ -114,7 +114,7 @@ export default function Footer() {
 
         <div className="border-t border-white/6">
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-5 text-xs text-white/40 sm:flex-row">
-            <p>© {year} AI Career copilot. Built for people applying.</p>
+            <p>© {year} AICareerCopilot. Built for people applying.</p>
             <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
               <Link href="/" className="hover:text-white/70">
                 Home

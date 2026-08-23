@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import ContactForm, { SUPPORT_EMAIL } from "./ContactForm";
 
 export const metadata: Metadata = {
-  title: "Contact — AI Career copilot",
+  title: "Contact — AICareerCopilot",
   description:
-    "Talk to the AI Career copilot team about product support, billing, security, or partnerships.",
+    "Talk to the AICareerCopilot team about product support, billing, security, or partnerships.",
 };
 
 const CHANNELS = [
@@ -22,7 +22,7 @@ const CHANNELS = [
   {
     title: "Security",
     detail: "Responsible disclosure",
-    href: `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("[Security] AI Career copilot")}`,
+    href: `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("[Security] AICareerCopilot")}`,
     caption: "Report a vulnerability privately. Do not post exploits publicly.",
   },
 ];

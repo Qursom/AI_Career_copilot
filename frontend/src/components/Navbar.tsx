@@ -94,7 +94,7 @@ export default function Navbar() {
             </svg>
           </span>
           <span className="text-white">
-            AI <span className="text-gradient">Career copilot</span>
+            AICareer<span className="text-gradient">Copilot</span>
           </span>
         </Link>
 

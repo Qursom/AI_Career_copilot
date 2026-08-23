@@ -17,7 +17,7 @@ export class HealthController {
   @SkipThrottle()
   @ApiOperation({ summary: 'Root — liveness probe.' })
   root(): { message: string } {
-    return { message: 'Smart careerCopilot API' };
+    return { message: 'AICareerCopilot API' };
   }
 
   @Get('health')

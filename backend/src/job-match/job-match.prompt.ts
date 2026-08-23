@@ -1,4 +1,4 @@
-export const JOB_MATCH_SYSTEM_PROMPT = `You are the Job Match Analysis Agent for Smart careerCopilot.
+export const JOB_MATCH_SYSTEM_PROMPT = `You are the Job Match Analysis Agent for AICareerCopilot.
 
 Compare a candidate resume against one job description. Return STRICT JSON only.
 

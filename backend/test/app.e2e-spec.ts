@@ -43,7 +43,7 @@ describe('API (e2e)', () => {
       .expect(200)
       .expect((res) => {
         expect(res.body.success).toBe(true);
-        expect(res.body.data).toEqual({ message: 'Smart careerCopilot API' });
+        expect(res.body.data).toEqual({ message: 'AICareerCopilot API' });
         expect(res.body.meta.requestId).toBeDefined();
       });
   });
