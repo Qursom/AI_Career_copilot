@@ -15,7 +15,7 @@ export class UserEntity {
   @Prop({ required: false, default: '' })
   photoUrl!: string;
 
-  @Prop({ required: true, default: 150 })
+  @Prop({ required: true, default: 20 })
   interviewCoins!: number;
 }
 

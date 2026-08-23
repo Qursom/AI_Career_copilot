@@ -48,7 +48,7 @@ function Dashboard() {
             <div
               className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-violet-400"
               style={{
-                width: `${Math.min(100, (user.interviewCoins / 150) * 100)}%`,
+                width: `${Math.min(100, (user.interviewCoins / 20) * 100)}%`,
               }}
             />
           </div>

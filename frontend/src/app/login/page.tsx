@@ -10,7 +10,7 @@ const AFTER_AUTH = "/dashboard";
 const PERKS = [
   "ATS score + roast + rewrite in one run",
   "Match any job description in seconds",
-  "150 coins to start — failed runs are free",
+  "20 coins to start — failed runs are free",
   "Your resume is not used to train models",
 ];
 

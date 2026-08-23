@@ -164,7 +164,7 @@ export const EnvSchema = z.object({
 
   RESUME_COIN_COST: z.coerce.number().int().positive().default(10),
   JOB_MATCH_COIN_COST: z.coerce.number().int().positive().default(10),
-  USER_STARTING_COINS: z.coerce.number().int().nonnegative().default(150),
+  USER_STARTING_COINS: z.coerce.number().int().nonnegative().default(20),
   RESUME_MAX_FILE_SIZE_MB: z.coerce.number().int().positive().default(20),
   RESUME_ANALYSIS_MAX_RETRIES: z.coerce.number().int().nonnegative().default(2),
 });

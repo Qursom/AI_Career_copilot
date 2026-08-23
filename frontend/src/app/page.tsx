@@ -52,7 +52,7 @@ const STEPS = [
 const STATS = [
   { value: "2,400+", label: "resumes roasted this week" },
   { value: "30s", label: "typical first analysis" },
-  { value: "150", label: "free coins to start" },
+  { value: "20", label: "free coins to start" },
   { value: "0", label: "charge if a run fails" },
 ];
 
@@ -306,7 +306,7 @@ export default function Home() {
               Your next role is one honest resume away.
             </h2>
             <p className="mt-4 text-white/60 max-w-xl mx-auto">
-              150 coins on signup. No credit card. Roast, rewrite, and
+              20 coins on signup. No credit card. Roast, rewrite, and
               match in the same workspace.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

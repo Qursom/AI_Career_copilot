@@ -276,7 +276,7 @@ The backend uses Google DNS (`8.8.8.8`, `1.1.1.1`) for Atlas SRV lookups on Wind
 
 | Collection | Purpose |
 |------------|---------|
-| `users` | Firebase UID (unique), email (indexed), profile, total coins (default 150) |
+| `users` | Firebase UID (unique), email (indexed), profile, total coins (default 20) |
 | `resumes` | One analysis per user (upserted on each run) |
 | `job_matches` | One row per user + JD/resume hash (history + content-addressed cache) |
 
@@ -342,7 +342,7 @@ Templates: `backend/.env.example`, `frontend/.env.local.example`. Never commit s
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Recommended | — | Path to service account JSON |
 | `RESUME_COIN_COST` | No | `10` | Coins per successful resume analysis |
 | `JOB_MATCH_COIN_COST` | No | `10` | Coins per new job-match score (cache hits are free) |
-| `USER_STARTING_COINS` | No | `150` | New user balance (never reset on later logins) |
+| `USER_STARTING_COINS` | No | `20` | New user balance (never reset on later logins) |
 | `RESUME_MAX_FILE_SIZE_MB` | No | `20` | Max PDF size |
 | `RESUME_ANALYSIS_MAX_RETRIES` | No | `2` | LangGraph retry limit |
 | `REDIS_CACHE_TTL_SECONDS` | No | `86400` | Resume cache TTL |
@@ -443,7 +443,7 @@ Restart `npm run dev` and re-run analyze/upload. Never put API keys in frontend 
 Browser → Firebase signInWithPopup → getIdToken()
        → POST /auth/login { idToken }
        → Firebase Admin verifyIdToken   (identity comes only from here)
-       → MongoDB findOrCreate user (150 coins on sign-up, never reset)
+       → MongoDB findOrCreate user (20 coins on sign-up, never reset)
        → Redis session:{32 random bytes} + HTTP-only session_id cookie
        → Subsequent requests use cookie (not Firebase per request)
 ```
