@@ -9,6 +9,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import type { Request, Response } from 'express';
 import helmet from 'helmet';
 import { JsonLogger } from './common/logging/json.logger';
 import { initSentry } from './common/logging/sentry';
@@ -133,16 +134,16 @@ async function bootstrap(): Promise<void> {
 function registerPublicProbes(app: NestExpressApplication): void {
   const health = app.get(HealthService);
   const http = app.getHttpAdapter();
-  http.get('/', (_req, res) => {
+  http.get('/', (_req: Request, res: Response) => {
     res.status(200).json({
       message: 'Smart careerCopilot API',
       health: '/api/v1/health',
     });
   });
-  http.get('/health', (_req, res) => {
+  http.get('/health', (_req: Request, res: Response) => {
     res.status(200).json(health.check());
   });
-  http.get('/favicon.ico', (_req, res) => {
+  http.get('/favicon.ico', (_req: Request, res: Response) => {
     res.status(204).end();
   });
 }
