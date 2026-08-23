@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [showEmail, setShowEmail] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
     if (!auth.isLoading && auth.isAuthenticated) {
@@ -28,9 +29,16 @@ export default function LoginPage() {
     }
   }, [auth.isLoading, auth.isAuthenticated, router]);
 
+  useEffect(() => {
+    if (auth.conflictAction === "password") {
+      setShowEmail(true);
+      setMode("signin");
+    }
+  }, [auth.conflictAction]);
+
   const onGoogle = () => {
     void auth
-      .loginWithGoogle()
+      .loginWithGoogle(email || undefined)
       .then(() => router.push(AFTER_AUTH))
       .catch(() => {
         // Message is surfaced through auth.error.
@@ -44,6 +52,16 @@ export default function LoginPage() {
         ? auth.signInEmail(email, password)
         : auth.registerEmail(email, password);
     void run.then(() => router.push(AFTER_AUTH)).catch(() => {});
+  };
+
+  const onForgotPassword = () => {
+    if (!email.trim()) {
+      return;
+    }
+    void auth
+      .requestPasswordReset(email)
+      .then(() => setResetSent(true))
+      .catch(() => {});
   };
 
   if (auth.isLoading || auth.isAuthenticated) {
@@ -130,6 +148,30 @@ export default function LoginPage() {
               {auth.error}
             </p>
           )}
+          {resetSent && (
+            <p role="status" className="mt-4 text-sm text-emerald-300">
+              Password reset email sent. Check your inbox.
+            </p>
+          )}
+
+          {auth.conflictAction === "password" && (
+            <button
+              type="button"
+              className="btn-primary mt-4 w-full justify-center"
+              onClick={() => {
+                setShowEmail(true);
+                setMode("signin");
+              }}
+            >
+              Sign in with Email & Password
+            </button>
+          )}
+          {auth.conflictAction === "google" && (
+            <p className="mt-4 text-xs text-white/50">
+              Use Continue with Google below, then add a password from Account
+              Settings.
+            </p>
+          )}
 
           <div className="mt-7">
             {auth.firebaseEnabled ? (
@@ -201,6 +243,15 @@ export default function LoginPage() {
                         ? "Sign in with email"
                         : "Create account"}
                   </button>
+                  {mode === "signin" && (
+                    <button
+                      type="button"
+                      className="w-full text-xs text-white/50 hover:text-white/80"
+                      onClick={onForgotPassword}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="w-full text-xs text-white/50 hover:text-white/80"

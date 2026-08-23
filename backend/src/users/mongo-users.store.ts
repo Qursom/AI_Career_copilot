@@ -42,6 +42,7 @@ export class MongoUsersStore implements UsersStore {
       firebaseUid: input.firebaseUid,
     });
     if (existing) {
+      // Identity is firebaseUid only. Never join or merge users by email.
       this.logger.log(`Sign-in: loaded users.firebaseUid=${input.firebaseUid}`);
       return this.toRecord(existing);
     }

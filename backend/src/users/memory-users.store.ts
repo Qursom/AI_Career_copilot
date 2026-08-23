@@ -31,6 +31,7 @@ export class MemoryUsersStore implements UsersStore {
   ): Promise<UserRecord> {
     const existing = this.byUid.get(input.firebaseUid);
     if (existing) {
+      // Identity is firebaseUid only. Never join or merge users by email.
       return Promise.resolve({ ...existing });
     }
     const created: UserRecord = {

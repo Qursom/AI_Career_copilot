@@ -12,13 +12,26 @@ import {
 } from "react";
 import { api, onSessionExpired, type AuthUser } from "@/lib/api";
 import {
+  ExistingAccountError,
+  type ConflictAction,
+  conflictActionForMethods,
+  registerBlockedMessage,
+  shouldBlockEmailRegister,
+} from "@/lib/auth-providers";
+import {
   createUserWithEmailAndPassword,
   firebaseAuthMessage,
   firebaseEnabled,
   firebaseSignOut,
   FirebaseNotConfiguredError,
   getFirebaseAuth,
+  linkEmailPassword as linkEmailPasswordOnFirebase,
+  linkGoogle as linkGoogleOnFirebase,
+  listSignInMethodsForEmail,
   onAuthStateChanged,
+  providerIdsOf,
+  sendPasswordReset,
+  sendVerificationEmail,
   signInWithEmailAndPassword,
   signInWithGoogle,
   type User as FirebaseUser,
@@ -55,18 +68,28 @@ interface AuthContextValue {
   /** Set when a protected request rejected a previously valid session. */
   sessionExpired: boolean;
   error: string | null;
+  /** Suggested next step when the email already belongs to another provider. */
+  conflictAction: ConflictAction;
   firebaseEnabled: boolean;
+  emailVerified: boolean;
+  firebaseEmail: string | null;
   devLoginAllowed: boolean;
   /**
    * Non-null only for the development `x-user-id` fallback. Real sessions
    * authenticate through the cookie, so pages must not send an identity header.
    */
   devUserId: string | null;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (emailHint?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   signInEmail: (email: string, password: string) => Promise<void>;
   registerEmail: (email: string, password: string) => Promise<void>;
+  linkEmailPassword: (password: string, email?: string) => Promise<void>;
+  linkGoogle: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  requestEmailVerification: () => Promise<void>;
+  authProviders: string[];
+  isLinking: boolean;
   signInDev: (uid?: string) => void;
   clearError: () => void;
   /** @deprecated Use `isLoading`. */
@@ -84,8 +107,6 @@ function toSession(user: AuthUser): AuthSession {
     name: user.name,
     photoUrl: user.photoUrl,
     interviewCoins: user.interviewCoins,
-    // Firebase refreshes this itself when the cached token is close to expiry.
-    // Returns "" for the dev fallback, where there is no Firebase user at all.
     getIdToken: async () => {
       const current = getFirebaseAuth()?.currentUser;
       return current ? current.getIdToken() : "";
@@ -104,19 +125,24 @@ function devUser(uid: string): AuthUser {
   };
 }
 
+function conflictFromError(err: unknown): ConflictAction {
+  if (err instanceof ExistingAccountError) return err.action;
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [devUserId, setDevUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflictAction, setConflictAction] = useState<ConflictAction>(null);
 
-  /** Guards against a second popup while one is already open. */
   const signInInFlight = useRef(false);
-  /** Firebase uid whose token we already spent on a silent session rebuild. */
   const silentReauthFor = useRef<string | null>(null);
 
   const readDevUid = useCallback((): string | null => {
@@ -137,8 +163,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [readDevUid]);
 
-  // Restore the server session on startup. Firebase's own client state is
-  // deliberately ignored here: the cookie + Redis session is the authority.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -153,7 +177,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [restore]);
 
-  // A 401 from any protected endpoint means the session died underneath us.
   useEffect(
     () =>
       onSessionExpired(() => {
@@ -165,8 +188,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Track Firebase's own persisted sign-in. It is not an authority on who the
-  // user is — it is a way to obtain a fresh ID token without another popup.
   useEffect(() => {
     const firebaseAuth = getFirebaseAuth();
     if (!firebaseAuth) return;
@@ -183,18 +204,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionExpired(false);
   }, []);
 
-  /** Exchanges the Firebase ID token for the backend session cookie. */
   const exchangeIdToken = useCallback(async (idToken: string) => {
     const { user: authenticated } = await api.loginWithIdToken(idToken);
     setUser(authenticated);
     setDevUserId(null);
     setSessionExpired(false);
+    setConflictAction(null);
   }, []);
 
-  // The session cookie expires long before Firebase forgets the account, so an
-  // expired session is rebuilt from a fresh ID token instead of dropping the
-  // user back onto the sign-in gate. One attempt per Firebase uid: if the
-  // exchange fails, an explicit sign-in is the remaining path.
   useEffect(() => {
     if (isLoading || isSigningIn || isSigningOut) return;
     if (user || !firebaseUser) return;
@@ -216,22 +233,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     exchangeIdToken,
   ]);
 
-  const loginWithGoogle = useCallback(async () => {
-    if (signInInFlight.current) return;
-    signInInFlight.current = true;
-    setIsSigningIn(true);
-    setError(null);
-    try {
-      const { idToken } = await signInWithGoogle();
-      await exchangeIdToken(idToken);
-    } catch (err) {
-      setError(firebaseAuthMessage(err, "google"));
-      throw err;
-    } finally {
-      signInInFlight.current = false;
-      setIsSigningIn(false);
-    }
-  }, [exchangeIdToken]);
+  const loginWithGoogle = useCallback(
+    async (emailHint?: string) => {
+      if (signInInFlight.current) return;
+      signInInFlight.current = true;
+      setIsSigningIn(true);
+      setError(null);
+      setConflictAction(null);
+      try {
+        const { idToken } = await signInWithGoogle(emailHint);
+        await exchangeIdToken(idToken);
+      } catch (err) {
+        setError(firebaseAuthMessage(err, "google"));
+        setConflictAction(conflictFromError(err));
+        throw err;
+      } finally {
+        signInInFlight.current = false;
+        setIsSigningIn(false);
+      }
+    },
+    [exchangeIdToken],
+  );
 
   const withEmailCredentials = useCallback(
     async (
@@ -245,13 +267,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInInFlight.current = true;
       setIsSigningIn(true);
       setError(null);
+      setConflictAction(null);
       try {
         await run(firebaseAuth);
         const idToken = await firebaseAuth.currentUser?.getIdToken();
-        if (!idToken) throw new Error("Firebase sign-in did not produce a user.");
+        if (!idToken) {
+          throw new Error("Firebase sign-in did not produce a user.");
+        }
         await exchangeIdToken(idToken);
       } catch (err) {
         setError(firebaseAuthMessage(err, "email"));
+        setConflictAction(conflictFromError(err));
         throw err;
       } finally {
         signInInFlight.current = false;
@@ -271,11 +297,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerEmail = useCallback(
     (email: string, password: string) =>
-      withEmailCredentials((firebaseAuth) =>
-        createUserWithEmailAndPassword(firebaseAuth, email, password),
-      ),
+      withEmailCredentials(async (firebaseAuth) => {
+        const methods = await listSignInMethodsForEmail(email);
+        if (shouldBlockEmailRegister(methods)) {
+          throw new ExistingAccountError(
+            registerBlockedMessage(methods),
+            conflictActionForMethods(methods) ?? "google",
+          );
+        }
+        await createUserWithEmailAndPassword(firebaseAuth, email, password);
+        const created = firebaseAuth.currentUser;
+        if (created) await sendVerificationEmail().catch(() => undefined);
+      }),
     [withEmailCredentials],
   );
+
+  const linkEmailPassword = useCallback(
+    async (password: string, email?: string) => {
+      setIsLinking(true);
+      setError(null);
+      try {
+        await linkEmailPasswordOnFirebase(password, email);
+        setFirebaseUser(getFirebaseAuth()?.currentUser ?? null);
+      } catch (err) {
+        setError(firebaseAuthMessage(err, "link"));
+        throw err;
+      } finally {
+        setIsLinking(false);
+      }
+    },
+    [],
+  );
+
+  const linkGoogle = useCallback(async () => {
+    setIsLinking(true);
+    setError(null);
+    try {
+      await linkGoogleOnFirebase();
+      setFirebaseUser(getFirebaseAuth()?.currentUser ?? null);
+    } catch (err) {
+      setError(firebaseAuthMessage(err, "link"));
+      throw err;
+    } finally {
+      setIsLinking(false);
+    }
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setError(null);
+    try {
+      await sendPasswordReset(email);
+    } catch (err) {
+      setError(firebaseAuthMessage(err, "email"));
+      throw err;
+    }
+  }, []);
+
+  const requestEmailVerification = useCallback(async () => {
+    setError(null);
+    try {
+      await sendVerificationEmail();
+    } catch (err) {
+      setError(firebaseAuthMessage(err, "email"));
+      throw err;
+    }
+  }, []);
 
   const signInDev = useCallback((uid = "local-dev-user") => {
     if (!devLoginAllowed) return;
@@ -301,12 +387,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDevUserId(null);
       setSessionExpired(false);
       setError(null);
+      setConflictAction(null);
     } finally {
       setIsSigningOut(false);
     }
   }, []);
 
-  const clearError = useCallback(() => setError(null), []);
+  const clearError = useCallback(() => {
+    setError(null);
+    setConflictAction(null);
+  }, []);
 
   const session = useMemo(() => (user ? toSession(user) : null), [user]);
 
@@ -320,7 +410,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSigningOut,
       sessionExpired,
       error,
+      conflictAction,
       firebaseEnabled,
+      emailVerified: firebaseUser?.emailVerified ?? false,
+      firebaseEmail: firebaseUser?.email ?? user?.email ?? null,
       devLoginAllowed,
       devUserId,
       loginWithGoogle,
@@ -328,6 +421,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshUser,
       signInEmail,
       registerEmail,
+      linkEmailPassword,
+      linkGoogle,
+      requestPasswordReset,
+      requestEmailVerification,
+      authProviders: providerIdsOf(firebaseUser),
+      isLinking,
       signInDev,
       clearError,
       loading: isLoading,
@@ -336,9 +435,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       user,
       session,
+      firebaseUser,
+      conflictAction,
       devUserId,
       isLoading,
       isSigningIn,
+      isLinking,
       isSigningOut,
       sessionExpired,
       error,
@@ -347,6 +449,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshUser,
       signInEmail,
       registerEmail,
+      linkEmailPassword,
+      linkGoogle,
+      requestPasswordReset,
+      requestEmailVerification,
       signInDev,
       clearError,
     ],

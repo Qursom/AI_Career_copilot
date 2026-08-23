@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AccountAuthCard from "@/components/AccountAuthCard";
 import RequireAuth from "@/components/RequireAuth";
 import { useAuth } from "@/lib/auth-context";
 
@@ -75,17 +76,7 @@ function Dashboard() {
         />
       </div>
 
-      <div className="mt-10 card">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-white/50">
-          Account
-        </h2>
-        <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Detail label="Name" value={user.name} />
-          <Detail label="Email" value={user.email} />
-          <Detail label="Total coins" value={String(user.interviewCoins)} />
-          <Detail label="Signed in with" value="Google" />
-        </dl>
-      </div>
+      <AccountAuthCard />
     </section>
   );
 }
@@ -110,17 +101,6 @@ function ActionCard({
       <Link href={href} className="btn-primary mt-5 justify-center">
         {cta}
       </Link>
-    </div>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-widest text-white/40">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm text-white/80 break-all">{value}</dd>
     </div>
   );
 }

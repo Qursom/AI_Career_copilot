@@ -4,13 +4,29 @@ import {
   type Auth,
   type UserCredential,
   GoogleAuthProvider,
+  EmailAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  fetchSignInMethodsForEmail,
+  linkWithCredential,
+  linkWithPopup,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
+import {
+  ExistingAccountError,
+  MSG_LINK_TIED_TO_OTHER_ACCOUNT,
+  MSG_SIGN_IN_EMAIL_THEN_LINK_GOOGLE,
+  MSG_SIGN_IN_EXISTING_METHOD,
+  MSG_SIGN_IN_GOOGLE_THEN_SET_PASSWORD,
+  accountExistsDifferentCredentialMessage,
+  conflictActionForMethods,
+  shouldBlockGoogleSignIn,
+} from "@/lib/auth-providers";
 
 /**
  * Client Firebase config. Every value here is public by design (it ships in the
@@ -54,21 +70,173 @@ export class FirebaseNotConfiguredError extends Error {
   }
 }
 
+export function providerIdsOf(user: User | null | undefined): string[] {
+  if (!user) return [];
+  return user.providerData
+    .map((entry) => entry.providerId)
+    .filter((id): id is string => Boolean(id));
+}
+
+/**
+ * Returns Firebase sign-in methods for an email.
+ * Empty on failure (email enumeration protection often hides methods).
+ */
+export async function listSignInMethodsForEmail(
+  email: string,
+): Promise<string[]> {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) throw new FirebaseNotConfiguredError();
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return [];
+  try {
+    return await fetchSignInMethodsForEmail(firebaseAuth, normalized);
+  } catch {
+    return [];
+  }
+}
+
+function emailFromAuthError(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const custom = (err as { customData?: { email?: unknown } }).customData;
+  const value = custom?.email;
+  return typeof value === "string" && value.includes("@") ? value : null;
+}
+
 /**
  * Opens the Google popup and returns a fresh Firebase ID token.
  *
- * The token is handed straight to the backend and never persisted in the
- * browser — the app session lives in the HTTP-only cookie the backend sets.
+ * When `emailHint` is known (login form), refuse Google if that email is
+ * already password-only — do not create a second Firebase user.
+ * Never auto-link a pending credential.
  */
-export async function signInWithGoogle(): Promise<{
+export async function signInWithGoogle(emailHint?: string): Promise<{
   credential: UserCredential;
   idToken: string;
 }> {
   const firebaseAuth = getFirebaseAuth();
   if (!firebaseAuth) throw new FirebaseNotConfiguredError();
-  const credential = await signInWithPopup(firebaseAuth, googleProvider);
-  const idToken = await credential.user.getIdToken();
-  return { credential, idToken };
+
+  if (emailHint?.trim()) {
+    const methods = await listSignInMethodsForEmail(emailHint);
+    if (shouldBlockGoogleSignIn(methods)) {
+      throw new ExistingAccountError(
+        MSG_SIGN_IN_EMAIL_THEN_LINK_GOOGLE,
+        "password",
+      );
+    }
+  }
+
+  try {
+    const credential = await signInWithPopup(firebaseAuth, googleProvider);
+    const idToken = await credential.user.getIdToken();
+    return { credential, idToken };
+  } catch (err) {
+    if (isAuthCode(err, "account-exists-with-different-credential")) {
+      const email = emailFromAuthError(err) ?? emailHint ?? "";
+      const methods = email ? await listSignInMethodsForEmail(email) : [];
+      throw new ExistingAccountError(
+        accountExistsDifferentCredentialMessage(methods),
+        conflictActionForMethods(methods) ?? "password",
+      );
+    }
+    throw err;
+  }
+}
+
+/**
+ * Links email/password onto the currently authenticated Firebase user.
+ * Email must match the signed-in account. UID does not change.
+ */
+export async function linkEmailPassword(
+  password: string,
+  email?: string,
+): Promise<string> {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) throw new FirebaseNotConfiguredError();
+  const user = firebaseAuth.currentUser;
+  const accountEmail = user?.email;
+  if (!user || !accountEmail) {
+    throw new Error(
+      "Sign in first, then add email and password to this same account.",
+    );
+  }
+  if (email?.trim() && email.trim().toLowerCase() !== accountEmail.toLowerCase()) {
+    throw new Error(
+      "Use the email on this signed-in account. We never attach a password to a different email.",
+    );
+  }
+  const uid = user.uid;
+  try {
+    await linkWithCredential(
+      user,
+      EmailAuthProvider.credential(accountEmail, password),
+    );
+    await user.reload();
+    if (!user.emailVerified) {
+      await sendEmailVerification(user).catch(() => undefined);
+    }
+  } catch (err) {
+    throw remapLinkError(err);
+  }
+  return uid;
+}
+
+export async function linkGoogle(): Promise<string> {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) throw new FirebaseNotConfiguredError();
+  const user = firebaseAuth.currentUser;
+  if (!user) {
+    throw new Error("Sign in first, then connect Google to this same account.");
+  }
+  const uid = user.uid;
+  try {
+    const result = await linkWithPopup(user, googleProvider);
+    if (result.user.uid !== uid) {
+      await signOut(firebaseAuth);
+      throw new ExistingAccountError(MSG_LINK_TIED_TO_OTHER_ACCOUNT);
+    }
+    await result.user.reload();
+  } catch (err) {
+    if (err instanceof ExistingAccountError) throw err;
+    throw remapLinkError(err);
+  }
+  return uid;
+}
+
+export async function sendVerificationEmail(): Promise<void> {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) throw new FirebaseNotConfiguredError();
+  const user = firebaseAuth.currentUser;
+  if (!user) throw new Error("Sign in first to verify your email.");
+  await sendEmailVerification(user);
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) throw new FirebaseNotConfiguredError();
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) throw new Error("Enter the email for your account first.");
+  await sendPasswordResetEmail(firebaseAuth, normalized);
+}
+
+function remapLinkError(err: unknown): Error {
+  if (
+    isAuthCode(err, "credential-already-in-use") ||
+    isAuthCode(err, "provider-already-linked") ||
+    isAuthCode(err, "email-already-in-use")
+  ) {
+    return new ExistingAccountError(MSG_LINK_TIED_TO_OTHER_ACCOUNT);
+  }
+  if (err instanceof Error) return err;
+  return new Error("Could not link this sign-in method.");
+}
+
+function isAuthCode(err: unknown, code: string): boolean {
+  if (!err || typeof err !== "object") return false;
+  const value =
+    "code" in err ? String((err as { code: unknown }).code) : "";
+  const message = err instanceof Error ? err.message : "";
+  return value.includes(code) || message.includes(code);
 }
 
 export async function firebaseSignOut(): Promise<void> {
@@ -79,9 +247,10 @@ export async function firebaseSignOut(): Promise<void> {
 /** Maps Firebase/auth failures onto copy a user can actually act on. */
 export function firebaseAuthMessage(
   err: unknown,
-  method: "google" | "email" = "email",
+  method: "google" | "email" | "link" = "email",
 ): string {
   if (err instanceof FirebaseNotConfiguredError) return err.message;
+  if (err instanceof ExistingAccountError) return err.message;
 
   const code =
     err && typeof err === "object" && "code" in err
@@ -92,6 +261,16 @@ export function firebaseAuthMessage(
 
   const googleSetup =
     "Google is not fully saved in Firebase yet. Open Authentication → Sign-in method → Google, turn Enable on, pick a Project support email, then click Save. Wait until the row shows Enabled, then try Continue with Google again.";
+
+  if (method === "link") {
+    if (
+      has("credential-already-in-use") ||
+      has("provider-already-linked") ||
+      has("email-already-in-use")
+    ) {
+      return MSG_LINK_TIED_TO_OTHER_ACCOUNT;
+    }
+  }
 
   if (
     method === "google" &&
@@ -117,12 +296,18 @@ export function firebaseAuthMessage(
     return "We could not reach Google. Check your connection and try again.";
   }
   if (has("account-exists-with-different-credential")) {
-    return "An account already exists with this email using a different sign-in method. Sign in with that method first.";
+    return MSG_SIGN_IN_EXISTING_METHOD;
+  }
+  if (has("email-already-in-use")) {
+    return MSG_SIGN_IN_GOOGLE_THEN_SET_PASSWORD;
   }
   if (has("too-many-requests")) {
     return "Too many attempts. Wait a minute and try again.";
   }
-  if (has("invalid-credential")) {
+  if (has("invalid-credential") || has("user-not-found") || has("wrong-password")) {
+    if (method === "email") {
+      return "Email or password is wrong. If you originally signed in with Google, use Continue with Google, then add a password in Account Settings.";
+    }
     return "Email or password is wrong, or this account does not exist yet. Click “Need an account? Register” first, then Sign in.";
   }
   if (has("unauthorized-domain")) {
@@ -142,3 +327,4 @@ export {
   onAuthStateChanged,
 };
 export type { User };
+export { ExistingAccountError };

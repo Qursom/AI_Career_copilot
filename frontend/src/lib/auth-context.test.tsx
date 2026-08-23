@@ -32,6 +32,12 @@ vi.mock("@/lib/api", () => ({
 
 const signInWithGoogle = vi.fn();
 const firebaseSignOut = vi.fn().mockResolvedValue(undefined);
+const listSignInMethodsForEmail = vi.fn().mockResolvedValue([]);
+const createUserWithEmailAndPassword = vi.fn();
+const signInWithEmailAndPassword = vi.fn();
+const linkEmailPassword = vi.fn();
+const linkGoogle = vi.fn();
+const providerIdsOf = vi.fn().mockReturnValue([]);
 
 /** Set by tests that need Firebase's persisted sign-in to exist. */
 let firebaseAuthInstance: { currentUser: unknown } | null = null;
@@ -39,15 +45,24 @@ const authStateListeners = new Set<(user: unknown) => void>();
 
 vi.mock("@/lib/firebase", () => ({
   firebaseEnabled: true,
-  signInWithGoogle: () => signInWithGoogle(),
+  signInWithGoogle: (...args: unknown[]) => signInWithGoogle(...args),
   firebaseSignOut: () => firebaseSignOut(),
   getFirebaseAuth: () => firebaseAuthInstance,
   onAuthStateChanged: (_auth: unknown, listener: (user: unknown) => void) => {
     authStateListeners.add(listener);
     return () => authStateListeners.delete(listener);
   },
-  signInWithEmailAndPassword: vi.fn(),
-  createUserWithEmailAndPassword: vi.fn(),
+  signInWithEmailAndPassword: (...args: unknown[]) =>
+    signInWithEmailAndPassword(...args),
+  createUserWithEmailAndPassword: (...args: unknown[]) =>
+    createUserWithEmailAndPassword(...args),
+  listSignInMethodsForEmail: (...args: unknown[]) =>
+    listSignInMethodsForEmail(...args),
+  linkEmailPassword: (...args: unknown[]) => linkEmailPassword(...args),
+  linkGoogle: (...args: unknown[]) => linkGoogle(...args),
+  providerIdsOf: (...args: unknown[]) => providerIdsOf(...args),
+  sendPasswordReset: vi.fn().mockResolvedValue(undefined),
+  sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
   firebaseAuthMessage: (err: unknown) =>
     err instanceof Error ? err.message : "Sign-in failed",
   FirebaseNotConfiguredError: class extends Error {},
@@ -73,6 +88,21 @@ function Probe() {
       <span data-testid="signing-in">{auth.isSigningIn ? "yes" : "no"}</span>
       <button onClick={() => void auth.loginWithGoogle().catch(() => {})}>
         sign in
+      </button>
+      <button
+        onClick={() =>
+          void auth.registerEmail("ada@example.com", "secret1").catch(() => {})
+        }
+      >
+        register
+      </button>
+      <button
+        onClick={() => void auth.linkEmailPassword("secret1").catch(() => {})}
+      >
+        set password
+      </button>
+      <button onClick={() => void auth.linkGoogle().catch(() => {})}>
+        link google
       </button>
       <button onClick={() => void auth.logout()}>sign out</button>
       <button onClick={() => void auth.refreshUser().catch(() => {})}>
@@ -102,6 +132,12 @@ describe("AuthProvider", () => {
     loginWithIdToken.mockReset();
     logoutRequest.mockReset().mockResolvedValue({ ok: true });
     signInWithGoogle.mockReset();
+    listSignInMethodsForEmail.mockReset().mockResolvedValue([]);
+    createUserWithEmailAndPassword.mockReset();
+    signInWithEmailAndPassword.mockReset();
+    linkEmailPassword.mockReset().mockResolvedValue("uid-1");
+    linkGoogle.mockReset().mockResolvedValue("uid-1");
+    providerIdsOf.mockReset().mockReturnValue([]);
   });
 
   it("restores an existing session on startup", async () => {
@@ -277,5 +313,55 @@ describe("AuthProvider", () => {
 
     expect(window.localStorage.length).toBe(0);
     expect(window.sessionStorage.length).toBe(0);
+  });
+
+  it("refuses to register when the email already has Google", async () => {
+    authMe.mockRejectedValue(new Error("401"));
+    listSignInMethodsForEmail.mockResolvedValue(["google.com"]);
+    firebaseAuthInstance = { currentUser: null };
+
+    renderProbe();
+    await waitFor(() => expect(status()).toBe("anonymous"));
+
+    await userEvent.click(screen.getByRole("button", { name: "register" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("error")).toHaveTextContent(
+        "An account already exists with this email. Please sign in with Google first",
+      ),
+    );
+    expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
+    expect(loginWithIdToken).not.toHaveBeenCalled();
+  });
+
+  it("links a password without exchanging a new identity", async () => {
+    authMe.mockResolvedValue({ user: USER });
+    firebaseAuthInstance = { currentUser: { uid: "uid-1", email: USER.email } };
+
+    renderProbe();
+    await waitFor(() => expect(status()).toBe("authenticated"));
+
+    await userEvent.click(screen.getByRole("button", { name: "set password" }));
+
+    await waitFor(() =>
+      expect(linkEmailPassword).toHaveBeenCalledWith("secret1", undefined),
+    );
+    expect(loginWithIdToken).not.toHaveBeenCalled();
+    expect(status()).toBe("authenticated");
+    expect(screen.getByTestId("coins")).toHaveTextContent("150");
+  });
+
+  it("links Google without exchanging a new identity", async () => {
+    authMe.mockResolvedValue({ user: USER });
+    firebaseAuthInstance = { currentUser: { uid: "uid-1", email: USER.email } };
+
+    renderProbe();
+    await waitFor(() => expect(status()).toBe("authenticated"));
+
+    await userEvent.click(screen.getByRole("button", { name: "link google" }));
+
+    await waitFor(() => expect(linkGoogle).toHaveBeenCalled());
+    expect(loginWithIdToken).not.toHaveBeenCalled();
+    expect(status()).toBe("authenticated");
   });
 });
