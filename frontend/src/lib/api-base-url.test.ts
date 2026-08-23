@@ -1,4 +1,5 @@
-import { resolveApiBaseUrl } from './api-base-url';
+import { describe, expect, it } from "vitest";
+import { resolveApiBaseUrl } from "./api-base-url";
 
 describe('resolveApiBaseUrl', () => {
   it('appends /api/v1 when only the Render origin is set', () => {
