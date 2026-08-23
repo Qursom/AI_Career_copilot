@@ -1,5 +1,6 @@
 import { mkdirSync } from 'fs';
 import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
 import { join } from 'path';
 import { Logger, Module, type Provider } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -45,8 +46,21 @@ const mongoOn = isMongoConfigured();
 const queueOn = isResumeQueueEnabled();
 const queueWorkerOn = queueOn && isResumeQueueWorkerEnabled();
 
-const uploadsDir = join(process.cwd(), 'uploads');
-mkdirSync(uploadsDir, { recursive: true });
+function ensureUploadsDir(): string {
+  const preferred = join(process.cwd(), 'uploads');
+  try {
+    mkdirSync(preferred, { recursive: true });
+    return preferred;
+  } catch {
+    // Render Docker runs as USER node; /app is root-owned unless the image
+    // created uploads. /tmp is always writable.
+    const fallback = join(tmpdir(), 'career-copilot-uploads');
+    mkdirSync(fallback, { recursive: true });
+    return fallback;
+  }
+}
+
+const uploadsDir = ensureUploadsDir();
 
 @Module({
   imports: [
