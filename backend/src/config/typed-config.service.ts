@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from './env.schema';
+import { parseCorsOrigins } from './cors-origins';
 
 /**
  * Thin, strongly-typed wrapper around `ConfigService` so consumers don't pass
@@ -23,9 +24,6 @@ export class TypedConfigService {
   }
 
   get corsOrigins(): string[] {
-    return this.get('CORS_ORIGIN')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    return parseCorsOrigins(this.get('CORS_ORIGIN'), this.get('FRONTEND_URL'));
   }
 }

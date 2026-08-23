@@ -14,6 +14,7 @@ import helmet from 'helmet';
 import { JsonLogger } from './common/logging/json.logger';
 import { initSentry } from './common/logging/sentry';
 import { AppModule } from './app.module';
+import { isAllowedBrowserOrigin } from './config/cors-origins';
 import { TypedConfigService } from './config/typed-config.service';
 import { HealthService } from './health/health.service';
 import { LlmService } from './llm/llm.service';
@@ -64,9 +65,12 @@ async function bootstrap(): Promise<void> {
       'CORS_ORIGIN contains "*", which is invalid alongside credentialed requests. Ignoring it — list the frontend origin explicitly.',
     );
   }
+  logger.log(`CORS allowlist: ${corsOrigins.join(', ') || '(empty)'}`);
 
   app.enableCors({
-    origin: corsOrigins,
+    origin: (origin, callback) => {
+      callback(null, isAllowedBrowserOrigin(origin, corsOrigins));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [

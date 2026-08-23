@@ -1,5 +1,6 @@
 import { EnvSchema, type Env } from './env.schema';
 import { hasUpstashRest, resolveRedisUrl } from './redis-url';
+import { parseCorsOrigins } from './cors-origins';
 
 /**
  * Used by `@nestjs/config`'s `validate` option. Runs once at boot.
@@ -81,6 +82,17 @@ function assertProductionReady(env: Env): void {
   if (env.CORS_ORIGIN.split(',').some((o) => o.trim() === '*')) {
     throw new Error(
       'CORS_ORIGIN cannot include * in production (credentialed session cookies).',
+    );
+  }
+  const publicOrigins = parseCorsOrigins(env.CORS_ORIGIN, env.FRONTEND_URL);
+  const hasHttpsUi = publicOrigins.some(
+    (origin) =>
+      origin.startsWith('https://') &&
+      !/localhost|127\.0\.0\.1/i.test(origin),
+  );
+  if (!hasHttpsUi) {
+    throw new Error(
+      'Production requires CORS_ORIGIN or FRONTEND_URL to be your https Vercel origin (not localhost).',
     );
   }
   if (env.STRIPE_SECRET_KEY && !env.STRIPE_WEBHOOK_SECRET) {

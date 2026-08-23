@@ -10,8 +10,11 @@
  * `ApiError` — never a raw response.
  */
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+import { resolveApiBaseUrl } from './api-base-url';
+
+export const API_BASE_URL = resolveApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_URL,
+);
 
 function apiUnreachableMessage(cause?: string): string {
   const isLocalApi = /localhost|127\.0\.0\.1/.test(API_BASE_URL);
@@ -37,7 +40,7 @@ function apiUnreachableMessage(cause?: string): string {
   return (
     `Cannot reach the API at ${API_BASE_URL}` +
     (cause ? ` (${cause})` : "") +
-    `. On Render, confirm the service is live and CORS_ORIGIN is this site’s origin.`
+    `. On Render set CORS_ORIGIN and FRONTEND_URL to this Vercel origin (https, no trailing slash), SESSION_COOKIE_SAMESITE=none, then redeploy the API. First request after idle can take ~60s.`
   );
 }
 
