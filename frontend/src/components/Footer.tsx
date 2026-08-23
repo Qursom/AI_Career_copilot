@@ -7,7 +7,8 @@ const PRODUCT = [
 ];
 
 const COMPANY = [
-  { href: "/about", label: "About" },
+  { href: "/", label: "Home" },
+  { href: "/contact", label: "Contact" },
   { href: "/login", label: "Sign in" },
   { href: "/dashboard", label: "Dashboard" },
 ];
@@ -115,8 +116,12 @@ export default function Footer() {
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-5 text-xs text-white/40 sm:flex-row">
             <p>© {year} AI Career copilot. Built for people applying.</p>
             <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-              <Link href="/about" className="hover:text-white/70">
-                About
+              <Link href="/" className="hover:text-white/70">
+                Home
+              </Link>
+              <span className="hidden sm:inline text-white/15">·</span>
+              <Link href="/contact" className="hover:text-white/70">
+                Contact
               </Link>
               <span className="hidden sm:inline text-white/15">·</span>
               <span className="inline-flex items-center gap-2">

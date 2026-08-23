@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 const PUBLIC_LINKS = [
   { href: "/resume", label: "Resume Tools" },
   { href: "/job-match", label: "Job Match" },
-  { href: "/about", label: "About" },
+  { href: "/contact", label: "Contact" },
 ];
 
 const AUTHED_LINKS = [
