@@ -46,7 +46,7 @@ export default function Footer() {
                 </span>
               </Link>
               <p className="max-w-sm text-sm leading-relaxed text-white/50">
-                Roast weak bullets, rewrite for ATS, and match any job
+                Critique weak bullets, rewrite for ATS, and match any job
                 description — then apply with a score you can stand behind.
               </p>
               <div className="flex flex-wrap gap-2">

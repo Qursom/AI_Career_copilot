@@ -26,9 +26,9 @@ export class ResumeAnalysisDto {
   education!: string[];
 
   @ApiProperty({
-    description: 'Honest, direct roast of the weakest parts of the resume.',
+    description: 'Honest, direct critique of the weakest parts of the resume.',
   })
-  roast!: string;
+  critique!: string;
 
   @ApiProperty({
     description: 'Clear strengths identified in the resume.',

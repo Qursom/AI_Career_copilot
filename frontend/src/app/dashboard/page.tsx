@@ -65,7 +65,7 @@ function Dashboard() {
         <ActionCard
           href="/resume"
           title="Analyze Resume"
-          description="Upload a PDF or paste text for an ATS score, roast, and rewrite."
+          description="Upload a PDF or paste text for an ATS score, critique, and rewrite."
           cta="Analyze Resume"
         />
         <ActionCard

@@ -18,7 +18,7 @@ Return STRICT JSON with these keys:
 - "projects": string[]
 - "experience": string[] (work experience highlights)
 - "education": string[]
-- "roast": string (direct, professional critique)
+- "critique": string (direct, professional critique of weak bullets, fluff, and gaps)
 - "strengths": string[] (3–5 concrete strengths)
 - "weaknesses": string[]
 - "improvements": string[] (actionable ATS-oriented improvements)

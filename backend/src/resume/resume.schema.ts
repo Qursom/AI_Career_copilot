@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { zProse, zScore0to100, zStringList } from '../common/zod-llm-json';
 
-export const ResumeAnalysisSchema = z.object({
+const ResumeAnalysisObject = z.object({
   fullName: z.string().min(1).max(200).default('Unknown'),
   email: z.string().max(200).default(''),
   phone: z.string().max(80).default(''),
@@ -10,7 +10,7 @@ export const ResumeAnalysisSchema = z.object({
   projects: zStringList(0, 20).default([]),
   experience: zStringList(0, 20).default([]),
   education: zStringList(0, 15).default([]),
-  roast: zProse(20, 4_000),
+  critique: zProse(20, 4_000),
   strengths: zStringList(1, 10),
   weaknesses: zStringList(0, 10).default([]),
   improvements: zStringList(1, 10),
@@ -24,5 +24,18 @@ export const ResumeAnalysisSchema = z.object({
   atsScore: zScore0to100,
   atsNotes: zProse(10, 4_000),
 });
+
+/** Accepts legacy persisted `roast` and maps it to `critique`. */
+export const ResumeAnalysisSchema = z.preprocess((val) => {
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    const o = { ...(val as Record<string, unknown>) };
+    if (typeof o.critique !== 'string' && typeof o.roast === 'string') {
+      o.critique = o.roast;
+    }
+    delete o.roast;
+    return o;
+  }
+  return val;
+}, ResumeAnalysisObject);
 
 export type ResumeAnalysis = z.infer<typeof ResumeAnalysisSchema>;

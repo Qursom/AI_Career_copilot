@@ -15,7 +15,7 @@ describe('MockLlmProvider', () => {
     });
     expect(out.atsScore).toBeGreaterThanOrEqual(0);
     expect(out.atsScore).toBeLessThanOrEqual(100);
-    expect(out.roast.length).toBeGreaterThan(0);
+    expect(out.critique.length).toBeGreaterThan(0);
     expect(out.strengths.length).toBeGreaterThan(0);
     expect(out.improvements.length).toBeGreaterThan(0);
     expect(Array.isArray(out.missingSkills)).toBe(true);

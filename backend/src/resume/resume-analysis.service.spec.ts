@@ -33,7 +33,7 @@ const extraFields = {
 function validAnalysis(overrides: Record<string, unknown> = {}) {
   return {
     ...extraFields,
-    roast: 'x'.repeat(30),
+    critique: 'x'.repeat(30),
     strengths: ['Strong TypeScript background', 'Shipped design systems'],
     improvements: ['Quantify mentoring impact', 'Replace weak verbs'],
     missingSkills: ['GraphQL', 'Accessibility (WCAG 2.2)'],

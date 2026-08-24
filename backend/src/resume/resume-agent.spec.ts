@@ -23,7 +23,7 @@ const baseResume = {
   projects: ['Design system'],
   experience: ['Led frontend platform; reduced latency 30%'],
   education: ['BSc CS'],
-  roast: 'Needs stronger quantified outcomes in recent roles overall.',
+  critique: 'Needs stronger quantified outcomes in recent roles overall.',
   strengths: ['TypeScript', 'Shipping'],
   weaknesses: ['Limited GraphQL'],
   improvements: ['Add metrics'],
@@ -42,6 +42,15 @@ const baseResume = {
 describe('Resume Zod schema', () => {
   it('accepts a valid result', () => {
     expect(ResumeAnalysisSchema.safeParse(baseResume).success).toBe(true);
+  });
+
+  it('maps legacy roast to critique', () => {
+    const { critique, ...rest } = baseResume;
+    const parsed = ResumeAnalysisSchema.safeParse({ ...rest, roast: critique });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.critique).toBe(critique);
+    }
   });
 
   it('rejects invalid ATS score', () => {

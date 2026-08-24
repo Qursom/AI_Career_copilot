@@ -151,13 +151,13 @@ function ResumeTool() {
           <span className="text-gradient">impossible to ignore</span>
         </h1>
         <p className="mt-4 max-w-2xl text-white/65 leading-relaxed">
-          Upload a PDF or paste text. Get an ATS score, an honest roast, and a
+          Upload a PDF or paste text. Get an ATS score, an honest critique, and a
           rewrite you can paste into your next application.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
           {[
             "ATS score /100",
-            "Honest roast",
+            "Honest critique",
             "Optimized rewrite",
             "Role-fit gaps",
           ].map((label) => (
@@ -269,9 +269,9 @@ function DoneView({ data }: { data: ResumeAnalysis }) {
       )}
 
       <ResultCard
-        title="AI Roast"
-        content={data.roast}
-        tone="roast"
+        title="AI Critique"
+        content={data.critique}
+        tone="critique"
         icon={
           <svg
             viewBox="0 0 24 24"
@@ -418,7 +418,7 @@ function EmptyState() {
   const steps = [
     { n: "1", title: "Pick a role", body: "Chips or type the job you want." },
     { n: "2", title: "Add your resume", body: "PDF drop or paste text." },
-    { n: "3", title: "Get the score", body: "ATS, roast, and a rewrite." },
+    { n: "3", title: "Get the score", body: "ATS, critique, and a rewrite." },
   ];
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8">

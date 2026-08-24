@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type Tone = "default" | "roast" | "success" | "warning" | "score";
+type Tone = "default" | "critique" | "success" | "warning" | "score";
 
 type ResultCardProps = {
   title: string;
@@ -19,10 +19,10 @@ const TONE_STYLES: Record<
     chip: "bg-white/10 text-white/70",
     chipLabel: "Result",
   },
-  roast: {
+  critique: {
     accent: "from-rose-500/20 to-orange-500/10",
     chip: "bg-rose-500/15 text-rose-200",
-    chipLabel: "Roast",
+    chipLabel: "Critique",
   },
   success: {
     accent: "from-emerald-500/20 to-teal-500/10",

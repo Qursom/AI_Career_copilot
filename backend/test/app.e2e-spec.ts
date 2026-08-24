@@ -120,7 +120,7 @@ describe('API (e2e)', () => {
         expect(res.body.success).toBe(true);
         const d = res.body.data;
         expect(typeof d.atsScore).toBe('number');
-        expect(typeof d.roast).toBe('string');
+        expect(typeof d.critique).toBe('string');
         expect(Array.isArray(d.strengths)).toBe(true);
         expect(d.strengths.length).toBeGreaterThan(0);
         expect(Array.isArray(d.improvements)).toBe(true);

@@ -86,7 +86,7 @@ export interface ResumeAnalysis {
   projects: string[];
   experience: string[];
   education: string[];
-  roast: string;
+  critique: string;
   strengths: string[];
   weaknesses: string[];
   improvements: string[];

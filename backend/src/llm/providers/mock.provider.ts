@@ -281,7 +281,7 @@ interface RoleProfile {
   hintPatterns: RegExp[];
   contentPatterns: RegExp[];
   coreSkills: SkillDef[];
-  roastHook: string;
+  critiqueHook: string;
   improvements: string[];
   bullets: string[];
   atsNotes: string;
@@ -317,7 +317,7 @@ const BACKEND_NODE: RoleProfile = {
     SKILL.security,
     SKILL.microservices,
   ],
-  roastHook:
+  critiqueHook:
     'This reads like a frontend résumé wearing a backend hoodie. I want to see queues, SQL plans, and on-call incident numbers — not CSS wins.',
   improvements: [
     'Quantify service performance with p50/p95/p99 latency, RPS, and error rate.',
@@ -365,7 +365,7 @@ const BACKEND_CSHARP: RoleProfile = {
     SKILL.security,
     SKILL.microservices,
   ],
-  roastHook:
+  critiqueHook:
     'Solid enterprise shape, but I am looking for C# / ASP.NET signals — APIs, EF Core, Azure — not a generic backend template.',
   improvements: [
     'Name C#, ASP.NET Core, and EF Core in the Skills block and in two recent bullets.',
@@ -409,7 +409,7 @@ const BACKEND_GENERIC: RoleProfile = {
     SKILL.security,
     SKILL.microservices,
   ],
-  roastHook:
+  critiqueHook:
     'Lots of adjectives, not enough throughput. Backend hiring managers skim for latency, RPS, and incident numbers — give them something to circle.',
   improvements: [
     'Quantify service performance (p95/p99 latency, RPS, error rate) on at least two bullets.',
@@ -451,7 +451,7 @@ const FRONTEND: RoleProfile = {
     SKILL.designSystem,
     SKILL.graphql,
   ],
-  roastHook:
+  critiqueHook:
     'Your resume reads like a component library README — heavy on tools, light on user outcomes. Lead with the number a PM would brag about.',
   improvements: [
     'Replace "responsible for" bullets with action verbs + measured outcomes.',
@@ -492,7 +492,7 @@ const FULLSTACK: RoleProfile = {
     SKILL.a11y,
     SKILL.cwv,
   ],
-  roastHook:
+  critiqueHook:
     'Full-stack means full-stack impact. I see the tools — now show me a feature you owned end-to-end with the business number attached.',
   improvements: [
     'Pick 2–3 features you owned end-to-end (UI → API → DB) and quantify impact.',
@@ -534,7 +534,7 @@ const DATA_ENGINEER: RoleProfile = {
     SKILL.observability,
     SKILL.cicd,
   ],
-  roastHook:
+  critiqueHook:
     'ETL soup with no volumes, no freshness SLAs, and no cost numbers. Data hiring managers want rows/day, $/query, and lineage — give them that.',
   improvements: [
     'Quantify pipeline volume (rows/day), freshness SLAs, and data-quality metrics.',
@@ -573,7 +573,7 @@ const ML: RoleProfile = {
     SKILL.aws,
     SKILL.observability,
   ],
-  roastHook:
+  critiqueHook:
     'Models without baselines, metrics, or business deltas are just Jupyter art. Put the lift number in the first bullet.',
   improvements: [
     'Report model metrics vs. a stated baseline (AUC, MAE, NDCG, etc.), not just the final number.',
@@ -615,7 +615,7 @@ const DEVOPS: RoleProfile = {
     SKILL.slo,
     SKILL.security,
   ],
-  roastHook:
+  critiqueHook:
     'Tools listed, outcomes missing. SRE resumes live or die on MTTR, error budget burn, and deploy frequency — lead with those.',
   improvements: [
     'Quantify reliability: MTTR, deploy frequency, change-failure rate, error-budget burn.',
@@ -652,7 +652,7 @@ const MOBILE: RoleProfile = {
     SKILL.observability,
     SKILL.a11y,
   ],
-  roastHook:
+  critiqueHook:
     'App-store pipeline, crash-free rate, and cold-start time are the three numbers a mobile lead asks about. Two of them are missing here.',
   improvements: [
     'Report crash-free sessions %, cold-start time, and app-size deltas.',
@@ -686,7 +686,7 @@ const QA: RoleProfile = {
     SKILL.observability,
     SKILL.ts,
   ],
-  roastHook:
+  critiqueHook:
     'No flake-rate, no coverage deltas, no pipeline time saved. QA leadership lives on those numbers.',
   improvements: [
     'Quantify flake-rate reduction and pipeline time saved.',
@@ -718,7 +718,7 @@ const GENERIC: RoleProfile = {
     SKILL.rest,
     SKILL.sql,
   ],
-  roastHook:
+  critiqueHook:
     'Your resume reads like it was written by a committee. Trade adjectives for numbers — recruiters scan bullets, they do not read essays.',
   improvements: [
     'Replace "responsible for" with action verbs + outcomes (led, built, shipped, cut, lifted).',
@@ -876,10 +876,10 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
     .filter(Boolean)
     .join(' ');
 
-  // ---- roast
+  // ---- critique
   const words = ctx.resume.split(/\s+/).filter(Boolean).length;
-  const roast = [
-    profile.roastHook,
+  const critique = [
+    profile.critiqueHook,
     `You used ${words} words; a recruiter spends ~7 seconds on the first pass.`,
     hasNumbers
       ? 'The numbers you do have are good — double down and quantify every bullet.'
@@ -903,7 +903,7 @@ function buildResponse(ctx: PromptCtx, profile: RoleProfile): unknown {
     projects: ['See resume projects — mock extraction'],
     experience: ['See resume experience — mock extraction'],
     education: ['See resume education — mock extraction'],
-    roast,
+    critique,
     strengths: dedupe(strengths).slice(0, 5),
     weaknesses: missingSkillLabels
       .slice(0, 4)

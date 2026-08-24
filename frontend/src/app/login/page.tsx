@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 const AFTER_AUTH = "/dashboard";
 
 const PERKS = [
-  "ATS score + roast + rewrite in one run",
+  "ATS score + critique + rewrite in one run",
   "Match any job description in seconds",
   "20 coins to start — failed runs are free",
   "Your resume is not used to train models",
@@ -82,7 +82,7 @@ export default function LoginPage() {
             <span className="text-gradient"> stronger resume</span> today.
           </h1>
           <p className="mt-4 text-white/55 leading-relaxed">
-            One workspace for roast, rewrite, ATS score, and job match. Google
+            One workspace for critique, rewrite, ATS score, and job match. Google
             sign-in takes about ten seconds.
           </p>
           <ul className="mt-8 space-y-3">

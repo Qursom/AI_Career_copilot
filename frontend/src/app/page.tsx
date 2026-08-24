@@ -2,7 +2,7 @@ import HeroAuthCta from "@/components/HeroAuthCta";
 
 const FEATURES = [
   {
-    title: "AI Roast",
+    title: "AI Critique",
     desc: "Brutally honest, specific feedback on every bullet — tone, impact, fluff, and gaps.",
     icon: (
       <path d="M12 2a7 7 0 0 1 7 7c0 4-4 4-4 9H9c0-5-4-5-4-9a7 7 0 0 1 7-7Z M9 22h6" />
@@ -45,12 +45,12 @@ const STEPS = [
   {
     n: "03",
     title: "Ship a better resume",
-    desc: "Copy the optimized version, keep the roast, and apply with a number you can defend.",
+    desc: "Copy the optimized version, keep the critique, and apply with a number you can defend.",
   },
 ];
 
 const STATS = [
-  { value: "2,400+", label: "resumes roasted this week" },
+  { value: "2,400+", label: "resumes critiqued this week" },
   { value: "30s", label: "typical first analysis" },
   { value: "20", label: "free coins to start" },
   { value: "0", label: "charge if a run fails" },
@@ -70,7 +70,7 @@ const LOGOS = [
 const QUOTES = [
   {
     quote:
-      "The roast called out three bullets I had been recycling for years. The rewrite got me the callback.",
+      "The critique called out three bullets I had been recycling for years. The rewrite got me the callback.",
     name: "Maya K.",
     role: "Backend engineer",
   },
@@ -99,7 +99,7 @@ const FAQS = [
   },
   {
     q: "How is this different from ChatGPT?",
-    a: "A dedicated pipeline: ATS scoring, roast, rewrite, and job-match against a JD — with your coins, history, and account in one place.",
+    a: "A dedicated pipeline: ATS scoring, critique, rewrite, and job-match against a JD — with your coins, history, and account in one place.",
   },
 ];
 
@@ -124,7 +124,7 @@ export default function Home() {
             </h1>
 
             <p className="mt-6 text-lg text-white/60 max-w-xl leading-relaxed">
-              Roast weak bullets, rewrite for the role, score ATS fit, and match
+              Critique weak bullets, rewrite for the role, score ATS fit, and match
               any job description — in seconds, not a Sunday rewrite session.
             </p>
 
@@ -306,7 +306,7 @@ export default function Home() {
               Your next role is one honest resume away.
             </h2>
             <p className="mt-4 text-white/60 max-w-xl mx-auto">
-              20 coins on signup. No credit card. Roast, rewrite, and
+              20 coins on signup. No credit card. Critique, rewrite, and
               match in the same workspace.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -371,7 +371,7 @@ function ProductPreview() {
         </div>
         <div className="mt-5 rounded-xl border border-white/8 bg-black/20 p-4">
           <p className="text-[11px] uppercase tracking-widest text-indigo-200/80">
-            Roast
+            Critique
           </p>
           <p className="mt-2 text-sm text-white/70 leading-relaxed">
             “Led projects” is doing no work. Name the system, the metric, and

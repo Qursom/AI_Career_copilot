@@ -1,8 +1,8 @@
 # AICareerCopilot
 
-**SaaS for job seekers:** roast a resume, rewrite for ATS, and score fit against any job description — then apply with numbers you can defend.
+**SaaS for job seekers:** critique a resume, rewrite for ATS, and score fit against any job description — then apply with numbers you can defend.
 
-This is a shipped product (and a portfolio case study of a full-stack AI SaaS): accounts, usage metering, LLM pipelines, optional market RAG, and production deploy.
+This is a shipped product (and a portfolio case study of a full-stack AI SaaS): accounts, usage metering, LLM pipelines, optional market RAG, and production deploy. Interview walkthrough: [PORTFOLIO.md](PORTFOLIO.md).
 
 | | |
 |---|---|
@@ -34,7 +34,7 @@ Identity is one Firebase user, one Mongo profile, one coin balance. Google and p
 | Module | What the user gets |
 |--------|-------------------|
 | **Dashboard** | Coins, shortcuts to resume and job match |
-| **Resume analysis** | ATS notes, roast, strengths/gaps, rewrite direction, parsed profile |
+| **Resume analysis** | ATS notes, critique, strengths/gaps, rewrite direction, parsed profile |
 | **Job match** | Fit score, missing requirements, bullets that close gaps |
 | **Account** | Linked sign-in methods (Google / email-password), coins |
 | **Billing** | Coin packs (Stripe when connected; otherwise starting grant) |
@@ -53,7 +53,7 @@ Land → Sign in
     Dashboard (20 coins)
          │
          ├─ Resume  →  PDF/text + optional target role
-         │              roast · ATS · rewrite
+         │              critique · ATS · rewrite
          │
          └─ Job match  →  JD + resume
                         score · gaps · tailored bullets
@@ -117,7 +117,7 @@ RAG is a **product capability**, not a demo stub. Labor-market snippets (skills,
 | Mode | Behavior |
 |------|----------|
 | On (`RAG_ENABLED` + Qdrant + ingest) | Embed query, retrieve hits, attach market signals / gaps / citations |
-| Off or misconfigured | Empty context; roast, ATS, and match still run |
+| Off or misconfigured | Empty context; critique, ATS, and match still run |
 
 Ingest: `npm run rag:ingest` (from `backend/`). Embeddings (`mock` or `gemini`) must match what was ingested.
 
@@ -193,6 +193,7 @@ Templates: `backend/.env.example`, `frontend/.env.example` (local only). Do not 
 frontend/    Product UI
 backend/     API, LangGraph resume, job match, RAG
 render.yaml  API (and optional web) Docker
+PORTFOLIO.md Interview / portfolio workflow
 ```
 
 ---
