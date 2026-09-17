@@ -530,4 +530,21 @@ export interface CoinPack {
   name?: string;
   description?: string;
   popular?: boolean;
+  amountCents?: number;
+  currency?: string;
+}
+
+export function formatCoinPrice(
+  amountCents: number | undefined,
+  currency = "usd",
+): string | null {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) return null;
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+    }).format(amountCents / 100);
+  } catch {
+    return `$${(amountCents / 100).toFixed(2)}`;
+  }
 }

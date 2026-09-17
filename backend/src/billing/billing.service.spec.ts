@@ -15,6 +15,8 @@ describe('parseCoinPacks', () => {
         name: 'Starter',
         description: 'About 5 resume analyses or job matches.',
         popular: false,
+        amountCents: 499,
+        currency: 'usd',
       },
       {
         id: 'plus',
@@ -23,6 +25,8 @@ describe('parseCoinPacks', () => {
         name: 'Plus',
         description: 'About 20 runs — best while you are actively applying.',
         popular: true,
+        amountCents: 1400,
+        currency: 'usd',
       },
     ]);
   });
@@ -63,6 +67,31 @@ describe('BillingService.packs', () => {
       enabled: false,
       packs: catalogPacks(),
     });
+    expect(service.packs().packs.map((pack) => pack.amountCents)).toEqual([
+      499, 1400, 2999,
+    ]);
+  });
+
+  it('enables checkout and keeps pack prices when Stripe price ids are set', () => {
+    const config = {
+      get: (key: string) => {
+        if (key === 'STRIPE_SECRET_KEY') return 'sk_test_x';
+        if (key === 'STRIPE_COIN_PACKS') {
+          return 'starter:price_abc:50,plus:price_def:200,pro:price_ghi:500';
+        }
+        return undefined;
+      },
+    };
+    const service = new BillingService(
+      config as unknown as TypedConfigService,
+      { creditCoins: jest.fn() } as unknown as UsersService,
+      new MemoryBillingLedger(),
+    );
+    const result = service.packs();
+    expect(result.enabled).toBe(true);
+    expect(result.packs.map((pack) => pack.amountCents)).toEqual([
+      499, 1400, 2999,
+    ]);
   });
 });
 

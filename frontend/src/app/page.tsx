@@ -1,3 +1,4 @@
+import CoinPacks from "@/components/CoinPacks";
 import HeroAuthCta from "@/components/HeroAuthCta";
 
 const FEATURES = [
@@ -91,7 +92,7 @@ const QUOTES = [
 const FAQS = [
   {
     q: "Is it free to try?",
-    a: "Yes. New accounts start with coins. Each successful resume analysis costs 10 coins. Failed runs are never charged.",
+    a: "Yes. New accounts start with coins. Each successful resume analysis costs 10 coins. Failed runs are never charged. Extra coins start at $4.99.",
   },
   {
     q: "Do you train on my resume?",
@@ -114,7 +115,7 @@ export default function Home() {
                 <span className="absolute inset-0 rounded-full bg-emerald-400 animate-pulse-ring" />
                 <span className="relative inline-block w-2 h-2 rounded-full bg-emerald-400" />
               </span>
-              Public beta · free to start
+              Free to start · coins from $4.99
             </span>
 
             <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
@@ -220,9 +221,26 @@ export default function Home() {
               <p className="mt-2 text-sm text-white/55 leading-relaxed">
                 {f.desc}
               </p>
+              <p className="mt-4 text-xs font-medium text-indigo-200/80">
+                10 coins per run
+              </p>
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 py-12">
+        <div className="mb-10 max-w-2xl">
+          <span className="chip glass text-white/70">Coins</span>
+          <h2 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight">
+            Pay per run, not per month.
+          </h2>
+          <p className="mt-3 text-white/55 leading-relaxed">
+            20 coins free on signup. Successful analyses cost 10 coins. Buy
+            more when you need them — prices below.
+          </p>
+        </div>
+        <CoinPacks />
       </section>
 
       <section className="max-w-6xl mx-auto px-6 py-12">

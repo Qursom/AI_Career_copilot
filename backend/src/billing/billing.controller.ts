@@ -24,6 +24,7 @@ import { CreateCheckoutDto } from './dto/create-checkout.dto';
 export class BillingController {
   constructor(private readonly billing: BillingService) {}
 
+  @SkipThrottle()
   @Get('packs')
   @ApiOperation({
     summary: 'Coin packs. enabled=false until Stripe keys and price IDs are set.',

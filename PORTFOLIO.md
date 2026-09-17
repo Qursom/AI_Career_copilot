@@ -1,6 +1,6 @@
 # Interview / portfolio workflow
 
-How to walk through [AICareerCopilot](https://ai-career-copilot-hazel.vercel.app) in an interview. Product and run docs: [README.md](README.md).
+How to walk through [AICareerCopilot](https://ai-career-copilot-hazel.vercel.app) in an interview. Product and run docs: [README.md](README.md). Full start-to-end architecture (auth, LangGraph, BullMQ, RAG, billing, deploy): [SYSTEM_FLOW.md](SYSTEM_FLOW.md).
 
 ---
 
@@ -111,8 +111,7 @@ Labor-market snippets from Qdrant injected into prompts. If off/misconfigured: e
 
 ## Talking points
 
-1. **Hybrid scoring** — LLM extracts evidence; TypeScript owns the % so a polished wrong-stack resume cannot score 90+.
-2. **Structured LLM** — Zod schemas + LangGraph retry; fail closed rather than ship invalid JSON.
+ 2. **Structured LLM** — Zod schemas + LangGraph retry; fail closed rather than ship invalid JSON.
 3. **Metering** — charge after success; refund if persist fails; cache hits free.
 4. **Degrade gracefully** — no Mongo → memory stores; no RAG → empty context; no LLM keys → mock (dev/tests).
 5. **Split deploy cookies** — `SameSite=None` + HTTPS so Vercel can call Render with credentials.

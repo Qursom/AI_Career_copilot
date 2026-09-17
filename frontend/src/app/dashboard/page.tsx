@@ -55,10 +55,10 @@ function Dashboard() {
           </div>
           <p className="mt-3 text-sm text-white/50">
             Each resume analysis costs 10 coins. Failed runs are never charged.
-            Purchases are not available yet — Stripe is not connected.
+            Buy more anytime — Starter is $4.99.
           </p>
           <Link href="/billing" className="btn-ghost mt-5 justify-center">
-            View coin packs
+            Buy coins
           </Link>
         </div>
 

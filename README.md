@@ -2,7 +2,7 @@
 
 **SaaS for job seekers:** critique a resume, rewrite for ATS, and score fit against any job description — then apply with numbers you can defend.
 
-This is a shipped product (and a portfolio case study of a full-stack AI SaaS): accounts, usage metering, LLM pipelines, optional market RAG, and production deploy. Interview walkthrough: [PORTFOLIO.md](PORTFOLIO.md).
+This is a shipped product (and a portfolio case study of a full-stack AI SaaS): accounts, usage metering, LLM pipelines, optional market RAG, optional BullMQ resume jobs, and production deploy. Short pitch: [PORTFOLIO.md](PORTFOLIO.md). Full system flow (technical interview): [SYSTEM_FLOW.md](SYSTEM_FLOW.md).
 
 | | |
 |---|---|
@@ -75,7 +75,8 @@ flowchart LR
   fb[Firebase Auth]
   api[API Render]
   mongo[MongoDB]
-  redis[Upstash]
+  redis[Upstash REST]
+  bull[BullMQ optional]
   llm[Gemini or Groq]
   rag[Qdrant RAG optional]
 
@@ -86,6 +87,8 @@ flowchart LR
   api --> mongo
   api --> redis
   api --> llm
+  api -.-> bull
+  bull -.-> redis
   api -.-> rag
 ```
 
@@ -105,6 +108,17 @@ Extract text → normalize → **optional RAG retrieve** → LLM analyze → val
 Content-hash cache (hit = free) → **optional RAG** → structured LLM → **evidence-weighted score in code** → charge → persist.
 
 The headline match % is finalized from requirement evidence (`job-match.score.ts`), not a raw model guess.
+
+### Resume queue (BullMQ)
+
+Resume analysis can run **inline** (default) or on **BullMQ**.
+
+| Mode | When | HTTP |
+|------|------|------|
+| Inline | `RESUME_QUEUE_ENABLED` is false (production default on a single Render instance) | `200` + analysis body |
+| Queued | `RESUME_QUEUE_ENABLED=true` and a Redis protocol URL (`REDIS_URL` / `UPSTASH_REDIS_URL`) | `202` + `jobId`; poll `GET /api/v1/resume/status/:jobId` |
+
+`RESUME_QUEUE_WORKER` (default true when the queue is on) runs the worker in the same process. Sessions and cache stay on **Upstash Redis REST**; BullMQ needs `redis://` or `rediss://`, not the REST URL. Custom job ids use `__` not `:` (BullMQ key separator).
 
 ---
 
@@ -132,11 +146,12 @@ Ingest: `npm run rag:ingest` (from `backend/`). Embeddings (`mock` or `gemini`) 
 | Auth | Firebase (Google + email/password + linking) |
 | Data | MongoDB Atlas (users, analyses) |
 | Session / cache | Upstash Redis REST |
+| Jobs | BullMQ (opt-in resume analysis) |
 | AI | Gemini or Groq; LangGraph-style resume graph |
-| Retrieval | Qdrant (optional) |
+| Retrieval | Qdrant (optional RAG) |
 | Payments | Stripe coin packs (code ready; keys optional) |
 
-This is the architecture you’d show as a **full SaaS slice**: auth, billing primitives, async-capable jobs, LLM orchestration, and graceful RAG degrade.
+This is the architecture you’d show as a **full SaaS slice**: auth, billing primitives, optional BullMQ jobs, LLM orchestration, and graceful RAG degrade.
 
 ---
 
@@ -177,23 +192,26 @@ App: http://localhost:3000 · API: http://localhost:3001 (`/` and `/api/v1/healt
 
 Templates: `backend/.env.example`, `frontend/.env.example` (local only). Do not commit secrets or `firebase-adminsdk.json`.
 
-**Production:** Vercel (`NEXT_PUBLIC_API_URL`, Firebase public config) + Render (`CORS_ORIGIN` / `FRONTEND_URL` = exact UI origin, Mongo, Upstash, LLM keys). Set `RAG_ENABLED=true` only after Qdrant + ingest.
+**Production:** Vercel (`NEXT_PUBLIC_API_URL`, Firebase public config) + Render (`CORS_ORIGIN` / `FRONTEND_URL` = exact UI origin, Mongo, Upstash, LLM keys). Set `RAG_ENABLED=true` only after Qdrant + ingest. Keep `RESUME_QUEUE_ENABLED=false` on a single Render instance unless you also set `REDIS_URL`.
 
 ---
 
 ## API (authenticated unless noted)
 
-`/api/v1` — `POST /auth/login` `{ idToken }` · `GET /auth/me` · `POST /auth/logout` · `GET /health` · resume analyze/upload/extract · `POST /job-match/score` · `GET /billing/packs`.
+`/api/v1` — `POST /auth/login` `{ idToken }` · `GET /auth/me` · `POST /auth/logout` · `GET /health` · resume analyze/upload/extract · `GET /resume/status/:jobId` (when queued) · `POST /job-match/score` · `GET /billing/packs`.
 
 ---
 
 ## Repo
 
 ```text
-frontend/    Product UI
-backend/     API, LangGraph resume, job match, RAG
-render.yaml  API (and optional web) Docker
-PORTFOLIO.md Interview / portfolio workflow
+frontend/       Product UI
+backend/        API, LangGraph resume, job match
+  src/queue/    BullMQ resume jobs (opt-in)
+  src/rag/      Qdrant ingest + retrieve
+render.yaml     API (and optional web) Docker
+PORTFOLIO.md    Short interview pitch
+SYSTEM_FLOW.md  Full system flow for technical interviews
 ```
 
 ---

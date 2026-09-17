@@ -191,12 +191,12 @@ export function CoinsEmptyCard({
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-white/70">
               Your balance is {balance}. Analyses and job matches only charge
-              after a successful run. Purchases are not available yet — Stripe
-              is not connected in this MVP.
+              after a successful run. Buy a coin pack to keep going — Starter
+              is $4.99.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link href="/billing" className="btn-ghost text-sm">
-                View coin packs
+              <Link href="/billing" className="btn-primary text-sm">
+                Buy coins
               </Link>
             </div>
           </div>

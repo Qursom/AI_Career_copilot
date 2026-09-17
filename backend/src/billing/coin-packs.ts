@@ -5,9 +5,11 @@ export interface CoinPack {
   name: string;
   description: string;
   popular: boolean;
+  amountCents: number;
+  currency: string;
 }
 
-/** Shown on /billing even before Stripe keys are added. */
+/** Shown on /billing even before Stripe keys are added. Amounts match Stripe Prices. */
 export const DEFAULT_COIN_PACKS: Omit<CoinPack, 'stripePriceId'>[] = [
   {
     id: 'starter',
@@ -15,6 +17,8 @@ export const DEFAULT_COIN_PACKS: Omit<CoinPack, 'stripePriceId'>[] = [
     name: 'Starter',
     description: 'About 5 resume analyses or job matches.',
     popular: false,
+    amountCents: 499,
+    currency: 'usd',
   },
   {
     id: 'plus',
@@ -22,6 +26,8 @@ export const DEFAULT_COIN_PACKS: Omit<CoinPack, 'stripePriceId'>[] = [
     name: 'Plus',
     description: 'About 20 runs — best while you are actively applying.',
     popular: true,
+    amountCents: 1400,
+    currency: 'usd',
   },
   {
     id: 'pro',
@@ -29,6 +35,8 @@ export const DEFAULT_COIN_PACKS: Omit<CoinPack, 'stripePriceId'>[] = [
     name: 'Pro',
     description: 'A larger balance for teams or a long search.',
     popular: false,
+    amountCents: 2999,
+    currency: 'usd',
   },
 ];
 
@@ -54,6 +62,8 @@ export function parseCoinPacks(raw: string | undefined): CoinPack[] {
       name: meta?.name ?? titleCase(id),
       description: meta?.description ?? `${coins} coins for resume and job-match runs.`,
       popular: meta?.popular ?? false,
+      amountCents: meta?.amountCents ?? 0,
+      currency: meta?.currency ?? 'usd',
     });
   }
   return packs;
