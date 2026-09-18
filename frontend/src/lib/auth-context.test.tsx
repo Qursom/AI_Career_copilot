@@ -46,13 +46,6 @@ const authStateListeners = new Set<(user: unknown) => void>();
 vi.mock("@/lib/firebase", () => ({
   firebaseEnabled: true,
   signInWithGoogle: (...args: unknown[]) => signInWithGoogle(...args),
-  consumeGoogleRedirect: () => Promise.resolve(null),
-  GoogleRedirectStartedError: class extends Error {
-    constructor() {
-      super("Redirecting to Google.");
-      this.name = "GoogleRedirectStartedError";
-    }
-  },
   firebaseSignOut: () => firebaseSignOut(),
   getFirebaseAuth: () => firebaseAuthInstance,
   onAuthStateChanged: (_auth: unknown, listener: (user: unknown) => void) => {

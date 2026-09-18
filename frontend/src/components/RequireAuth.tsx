@@ -106,7 +106,7 @@ export function AuthLoading() {
   return (
     <section className="max-w-5xl mx-auto px-6 pt-16 pb-20" aria-busy="true">
       <p className="sr-only" role="status">
-        Loading session…
+        Loading…
       </p>
       <div className="h-8 w-56 rounded-lg bg-white/5 animate-pulse" />
       <div className="mt-4 h-4 w-80 max-w-full rounded bg-white/5 animate-pulse" />

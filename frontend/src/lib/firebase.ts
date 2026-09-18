@@ -8,8 +8,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   fetchSignInMethodsForEmail,
   linkWithCredential,
   linkWithPopup,
@@ -72,35 +70,6 @@ export class FirebaseNotConfiguredError extends Error {
   }
 }
 
-/** Thrown after `signInWithRedirect` starts so callers do not treat navigation as failure. */
-export class GoogleRedirectStartedError extends Error {
-  constructor() {
-    super("Redirecting to Google.");
-    this.name = "GoogleRedirectStartedError";
-  }
-}
-
-function useGoogleRedirect(): boolean {
-  if (typeof window === "undefined") return false;
-  const { protocol, hostname } = window.location;
-  return protocol === "https:" && hostname !== "localhost" && hostname !== "127.0.0.1";
-}
-
-/**
- * Completes Google sign-in after `signInWithRedirect` returns to this origin.
- */
-export async function consumeGoogleRedirect(): Promise<{
-  credential: UserCredential;
-  idToken: string;
-} | null> {
-  const firebaseAuth = getFirebaseAuth();
-  if (!firebaseAuth) return null;
-  const credential = await getRedirectResult(firebaseAuth);
-  if (!credential) return null;
-  const idToken = await credential.user.getIdToken();
-  return { credential, idToken };
-}
-
 export function providerIdsOf(user: User | null | undefined): string[] {
   if (!user) return [];
   return user.providerData
@@ -158,15 +127,10 @@ export async function signInWithGoogle(emailHint?: string): Promise<{
   }
 
   try {
-    if (useGoogleRedirect()) {
-      await signInWithRedirect(firebaseAuth, googleProvider);
-      throw new GoogleRedirectStartedError();
-    }
     const credential = await signInWithPopup(firebaseAuth, googleProvider);
     const idToken = await credential.user.getIdToken();
     return { credential, idToken };
   } catch (err) {
-    if (err instanceof GoogleRedirectStartedError) throw err;
     if (isAuthCode(err, "account-exists-with-different-credential")) {
       const email = emailFromAuthError(err) ?? emailHint ?? "";
       const methods = email ? await listSignInMethodsForEmail(email) : [];
@@ -286,7 +250,6 @@ export function firebaseAuthMessage(
   method: "google" | "email" | "link" = "email",
 ): string {
   if (err instanceof FirebaseNotConfiguredError) return err.message;
-  if (err instanceof GoogleRedirectStartedError) return "";
   if (err instanceof ExistingAccountError) return err.message;
 
   const code =
