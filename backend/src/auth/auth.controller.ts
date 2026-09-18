@@ -14,7 +14,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService, type AuthUserDto } from './auth.service';
 import { AuthGuard } from './auth.guard';
@@ -41,7 +41,6 @@ export class AuthController {
     return this.auth.loginWithIdToken(dto.idToken, res);
   }
 
-  @SkipThrottle()
   @Get('me')
   @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Return the current session user from MongoDB.' })
