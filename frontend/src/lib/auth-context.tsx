@@ -20,10 +20,12 @@ import {
 } from "@/lib/auth-providers";
 import {
   createUserWithEmailAndPassword,
+  consumeGoogleRedirect,
   firebaseAuthMessage,
   firebaseEnabled,
   firebaseSignOut,
   FirebaseNotConfiguredError,
+  GoogleRedirectStartedError,
   getFirebaseAuth,
   linkEmailPassword as linkEmailPasswordOnFirebase,
   linkGoogle as linkGoogleOnFirebase,
@@ -166,6 +168,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      try {
+        const redirected = await Promise.race([
+          consumeGoogleRedirect(),
+          new Promise<null>((_, reject) => {
+            setTimeout(() => reject(new Error("redirect-timeout")), 12_000);
+          }),
+        ]);
+        if (cancelled) return;
+        if (redirected) {
+          const { user: authenticated } = await api.loginWithIdToken(
+            redirected.idToken,
+          );
+          if (cancelled) return;
+          setUser(authenticated);
+          setDevUserId(null);
+          setSessionExpired(false);
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+      }
       const restored = await restore();
       if (cancelled) return;
       setUser(restored.user);
@@ -244,6 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { idToken } = await signInWithGoogle(emailHint);
         await exchangeIdToken(idToken);
       } catch (err) {
+        if (err instanceof GoogleRedirectStartedError) return;
         setError(firebaseAuthMessage(err, "google"));
         setConflictAction(conflictFromError(err));
         throw err;

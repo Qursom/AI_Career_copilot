@@ -44,7 +44,12 @@ async function bootstrap(): Promise<void> {
   app.set('x-powered-by', false);
 
   app.use(
-    helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }),
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: false,
+      // Google / Firebase sign-in popups need to read window.closed.
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    }),
   );
   app.use(compression());
   app.use(cookieParser());
