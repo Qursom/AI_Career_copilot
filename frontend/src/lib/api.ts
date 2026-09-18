@@ -538,7 +538,9 @@ export function formatCoinPrice(
   amountCents: number | undefined,
   currency = "usd",
 ): string | null {
-  if (!Number.isInteger(amountCents) || amountCents <= 0) return null;
+  if (typeof amountCents !== "number" || !Number.isInteger(amountCents) || amountCents <= 0) {
+    return null;
+  }
   try {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
